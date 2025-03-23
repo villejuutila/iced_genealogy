@@ -1,0 +1,8 @@
+[package]
+name = "iced-graph"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced = { version = "0.13.1", features = ["canvas"] }
+uuid = { version = "1.16.0", features = ["v4"] }

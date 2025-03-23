@@ -1,0 +1,7 @@
+{
+  "[rust]": {
+    "editor.tabSize": 4,
+  },
+  "rust-assist.formatOnSave": true,
+  "rust-analyzer.cargo.buildScripts.rebuildOnSave": true,
+}
