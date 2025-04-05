@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 iced = { version = "0.13.1", features = ["canvas"] }
+iced_aw = "0.12.2"
 uuid = { version = "1.16.0", features = ["v4"] }

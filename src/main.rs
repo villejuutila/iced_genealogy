@@ -1,3 +1,4 @@
+mod context_menu;
 mod graph;
 
 use graph::{Graph, GraphMessage};

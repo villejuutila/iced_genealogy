@@ -1,4 +1,5 @@
 use iced::{
+    event::Status,
     mouse,
     widget::{
         canvas::{self, Frame, Stroke},
@@ -9,6 +10,8 @@ use iced::{
     Point, Rectangle, Renderer, Size, Theme,
 };
 use uuid::Uuid;
+
+use crate::context_menu::ContextMenu;
 
 #[derive(Debug, Clone)]
 pub struct GraphNode {
@@ -38,6 +41,7 @@ impl GraphNode {
 pub enum GraphInteraction {
     None,
     HoverGraphNode(u128),
+    ShowContextMenu(Point),
 }
 
 impl Default for GraphInteraction {
@@ -82,26 +86,33 @@ impl canvas::Program<GraphMessage> for Graph {
         cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>) {
         let mut message = None;
+        let mut status = Status::Ignored;
+
         let Some(cursor_position) = cursor.position() else {
-            return (canvas::event::Status::Ignored, message);
+            return (status, message);
         };
         for node in &self.nodes {
             if node.is_inside(cursor_position) {
                 *state = GraphInteraction::HoverGraphNode(node.id);
-                return (canvas::event::Status::Captured, message);
+                status = Status::Captured;
+                return (status, message);
             }
         }
         match event {
             canvas::Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::ButtonReleased(button) => match button {
                     mouse::Button::Left => message = Some(GraphMessage::InsertNode(GraphNode::new(cursor_position))),
+                    mouse::Button::Right => {
+                        *state = GraphInteraction::ShowContextMenu(cursor_position);
+                        status = Status::Captured;
+                    }
                     _ => *state = GraphInteraction::None,
                 },
                 _ => *state = GraphInteraction::None,
             },
             _ => *state = GraphInteraction::None,
         }
-        (canvas::event::Status::Ignored, message)
+        (status, message)
     }
 
     fn draw(
@@ -112,7 +123,8 @@ impl canvas::Program<GraphMessage> for Graph {
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
-        let frames = self
+        println!("{:?}", interaction);
+        let mut frames = self
             .nodes
             .iter()
             .map(|node| {
@@ -132,7 +144,14 @@ impl canvas::Program<GraphMessage> for Graph {
                 );
                 frame.into_geometry()
             })
-            .collect();
+            .collect::<Vec<_>>();
+        match interaction {
+            GraphInteraction::ShowContextMenu(point) => {
+                let mut context_menu = ContextMenu::draw(*point, renderer, bounds);
+                frames.append(&mut context_menu);
+            }
+            _ => {}
+        };
         frames
     }
 }
