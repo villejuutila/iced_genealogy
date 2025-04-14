@@ -29,7 +29,6 @@ impl App {
                 }
                 GraphMessage::MoveCursor(cursor_position) => self.graph.cursor_position = cursor_position,
                 GraphMessage::SelectNode(node_id) | GraphMessage::DeselectNode(node_id) => {
-                    println!("Node ID: {}", node_id);
                     self.graph.toggle_node_selection(node_id);
                 }
             },

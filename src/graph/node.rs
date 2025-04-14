@@ -7,6 +7,7 @@ use uuid::Uuid;
 use super::GraphInteraction;
 
 const ANCHOR_PADDING: f32 = 20.0;
+const ANCHOR_RADIUS: f32 = 5.0;
 
 #[derive(Debug, Clone)]
 pub struct GraphNode {
@@ -33,6 +34,13 @@ impl GraphNode {
             && point.y <= self.anchor.y + self.size.height
     }
 
+    pub fn is_on_anchor(&self, point: Point) -> bool {
+        let anchors = self.anchors();
+        anchors
+            .iter()
+            .any(|anchor| (point.x - anchor.x).abs() < ANCHOR_RADIUS && (point.y - anchor.y).abs() < ANCHOR_RADIUS)
+    }
+
     fn anchors(&self) -> Vec<Point> {
         vec![
             Point::new(self.anchor.x + self.size.width / 2.0, self.anchor.y - ANCHOR_PADDING),
@@ -55,10 +63,10 @@ impl GraphNode {
         } else {
             Color::WHITE
         };
-        println!("Self {:?}", self);
+
         if self.selected {
             self.anchors().iter().for_each(|anchor| {
-                let circle = canvas::Path::circle(*anchor, 5.0);
+                let circle = canvas::Path::circle(*anchor, ANCHOR_RADIUS);
                 frame.fill(&circle, Color::WHITE);
             });
         }

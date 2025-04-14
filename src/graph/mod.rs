@@ -116,10 +116,9 @@ impl Graph {
                         status = Status::Captured;
                         return (status, message, state);
                     }
-                    println!("Clicked at: {:?}", self.cursor_position);
+
                     self.nodes.iter().for_each(|node| {
                         if node.is_inside(self.cursor_position) {
-                            println!("Clicked Node ID: {}", node.id);
                             *state = GraphInteraction::None;
                             message = if node.selected {
                                 Some(GraphMessage::DeselectNode(node.id))
@@ -141,6 +140,23 @@ impl Graph {
 
 impl canvas::Program<GraphMessage> for Graph {
     type State = GraphInteraction;
+
+    fn mouse_interaction(
+        &self,
+        _state: &Self::State,
+        _bounds: Rectangle,
+        cursor: iced::advanced::mouse::Cursor,
+    ) -> iced::advanced::mouse::Interaction {
+        if self
+            .nodes
+            .iter()
+            .any(|node| node.is_on_anchor(cursor.position().unwrap()))
+        {
+            iced::advanced::mouse::Interaction::Pointer
+        } else {
+            iced::advanced::mouse::Interaction::Idle
+        }
+    }
 
     fn update(
         &self,
