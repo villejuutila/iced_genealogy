@@ -30,6 +30,8 @@ impl Default for GraphInteraction {
 pub enum GraphMessage {
     InsertNode(GraphNode),
     MoveCursor(Point),
+    SelectNode(u128),
+    DeselectNode(u128),
 }
 
 pub struct Graph {
@@ -47,6 +49,11 @@ impl Default for Graph {
 }
 
 impl Graph {
+    pub fn toggle_node_selection(&mut self, node_id: u128) {
+        if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
+            node.selected = !node.selected;
+        }
+    }
     pub fn view(&self) -> Element<GraphMessage> {
         Canvas::new(self).width(Fill).height(Fill).into()
     }
@@ -97,17 +104,31 @@ impl Graph {
         &self,
         event: mouse::Event,
         mut message: Option<GraphMessage>,
-        status: Status,
+        mut status: Status,
         state: &'a mut GraphInteraction,
     ) -> (canvas::event::Status, Option<GraphMessage>, &'a mut GraphInteraction) {
         match event {
             mouse::Event::ButtonReleased(button) => match button {
                 mouse::Button::Left => {
                     if state == &GraphInteraction::PhantomGraphNode {
-                        let node = GraphNode::new(self.cursor_position);
-                        message = Some(GraphMessage::InsertNode(node));
+                        message = Some(GraphMessage::InsertNode(GraphNode::new(self.cursor_position)));
                         *state = GraphInteraction::None;
+                        status = Status::Captured;
+                        return (status, message, state);
                     }
+                    println!("Clicked at: {:?}", self.cursor_position);
+                    self.nodes.iter().for_each(|node| {
+                        if node.is_inside(self.cursor_position) {
+                            println!("Clicked Node ID: {}", node.id);
+                            *state = GraphInteraction::None;
+                            message = if node.selected {
+                                Some(GraphMessage::DeselectNode(node.id))
+                            } else {
+                                Some(GraphMessage::SelectNode(node.id))
+                            };
+                            status = Status::Captured;
+                        }
+                    })
                 }
                 _ => {}
             },
@@ -129,7 +150,7 @@ impl canvas::Program<GraphMessage> for Graph {
         cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>) {
         let mut message = None;
-        let mut status = Status::Ignored;
+        let status = Status::Ignored;
 
         let cursor_position = match cursor.position() {
             Some(cursor_position) => {
@@ -140,12 +161,13 @@ impl canvas::Program<GraphMessage> for Graph {
             }
             None => return (status, message),
         };
+
         if state != &GraphInteraction::PhantomGraphNode {
             for node in &self.nodes {
                 if node.is_inside(cursor_position) {
                     *state = GraphInteraction::HoverGraphNode(node.id);
-                    status = Status::Captured;
-                    return (status, message);
+                } else {
+                    *state = GraphInteraction::None;
                 }
             }
         }
@@ -163,23 +185,22 @@ impl canvas::Program<GraphMessage> for Graph {
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
-        let mut frames = self
-            .nodes
-            .iter()
-            .map(|node| node.draw(renderer, &bounds, interaction))
-            .collect::<Vec<_>>();
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        for node in self.nodes.iter() {
+            node.draw(&mut frame, interaction);
+        }
+
         match interaction {
             GraphInteraction::PhantomGraphNode => {
-                let mut frame = Frame::new(renderer, bounds.size());
                 frame.fill_rectangle(
                     self.cursor_position,
                     Size::new(100.0, 100.0),
                     Color { a: 0.2, ..Color::WHITE },
                 );
-                frames.push(frame.into_geometry());
             }
             _ => {}
         };
-        frames
+        vec![frame.into_geometry()]
     }
 }

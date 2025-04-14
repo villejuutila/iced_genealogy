@@ -1,16 +1,19 @@
 use iced::{
-    widget::canvas::{Frame, Geometry, Stroke},
-    Color, Point, Rectangle, Renderer, Size,
+    widget::canvas::{self, Frame, Stroke},
+    Color, Point, Size,
 };
 use uuid::Uuid;
 
 use super::GraphInteraction;
+
+const ANCHOR_PADDING: f32 = 20.0;
 
 #[derive(Debug, Clone)]
 pub struct GraphNode {
     pub id: u128,
     pub anchor: Point,
     pub size: Size,
+    pub selected: bool,
 }
 
 impl GraphNode {
@@ -19,6 +22,7 @@ impl GraphNode {
             id: Uuid::new_v4().as_u128(),
             anchor,
             size: Size::new(100.0, 100.0),
+            selected: false,
         }
     }
 
@@ -29,13 +33,35 @@ impl GraphNode {
             && point.y <= self.anchor.y + self.size.height
     }
 
-    pub fn draw(&self, renderer: &Renderer, bounds: &Rectangle, interaction: &GraphInteraction) -> Geometry {
-        let color = if interaction == &GraphInteraction::HoverGraphNode(self.id) {
+    fn anchors(&self) -> Vec<Point> {
+        vec![
+            Point::new(self.anchor.x + self.size.width / 2.0, self.anchor.y - ANCHOR_PADDING),
+            Point::new(
+                (self.anchor.x + ANCHOR_PADDING) + self.size.width,
+                self.anchor.y + self.size.height / 2.0,
+            ),
+            Point::new(
+                self.anchor.x + self.size.width / 2.0,
+                self.anchor.y + self.size.height + ANCHOR_PADDING,
+            ),
+            Point::new(self.anchor.x - ANCHOR_PADDING, self.anchor.y + self.size.height / 2.0),
+        ]
+    }
+
+    pub fn draw<'a>(&self, frame: &'a mut Frame, interaction: &GraphInteraction) -> Vec<&'a Frame> {
+        let hovered = interaction == &GraphInteraction::HoverGraphNode(self.id);
+        let color = if hovered {
             Color { a: 0.5, ..Color::WHITE }
         } else {
             Color::WHITE
         };
-        let mut frame = Frame::new(renderer, bounds.size());
+        println!("Self {:?}", self);
+        if self.selected {
+            self.anchors().iter().for_each(|anchor| {
+                let circle = canvas::Path::circle(*anchor, 5.0);
+                frame.fill(&circle, Color::WHITE);
+            });
+        }
         frame.fill_rectangle(self.anchor, self.size, color);
         frame.stroke_rectangle(
             self.anchor,
@@ -44,6 +70,28 @@ impl GraphNode {
                 .with_width(2.0)
                 .with_color(Color::from_rgb(255.0, 0.0, 0.0)),
         );
-        frame.into_geometry()
+        frame.fill_text(canvas::Text {
+            content: "Testi".to_string(),
+            size: 20.0.into(),
+            color: Color {
+                a: 1.,
+                r: 1.,
+                g: 0.,
+                b: 0.,
+            },
+            position: self.text_position(),
+            vertical_alignment: iced::alignment::Vertical::Center,
+            horizontal_alignment: iced::alignment::Horizontal::Center,
+            ..Default::default()
+        });
+
+        vec![frame]
+    }
+
+    fn text_position(&self) -> Point {
+        Point::new(
+            self.anchor.x + self.size.width / 2.0,
+            self.anchor.y + self.size.height / 2.0,
+        )
     }
 }
