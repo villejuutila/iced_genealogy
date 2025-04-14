@@ -4,7 +4,7 @@ use iced::{
     event::Status,
     keyboard, mouse,
     widget::{
-        canvas::{self, Frame, Stroke},
+        canvas::{self, Frame},
         Canvas,
     },
     Color, Element,
@@ -76,7 +76,7 @@ impl Graph {
     fn on_keyboard_event<'a>(
         &self,
         event: keyboard::Event,
-        mut message: Option<GraphMessage>,
+        message: Option<GraphMessage>,
         mut status: Status,
         state: &'a mut GraphInteraction,
     ) -> (canvas::event::Status, Option<GraphMessage>, &'a mut GraphInteraction) {
@@ -97,7 +97,7 @@ impl Graph {
         &self,
         event: mouse::Event,
         mut message: Option<GraphMessage>,
-        mut status: Status,
+        status: Status,
         state: &'a mut GraphInteraction,
     ) -> (canvas::event::Status, Option<GraphMessage>, &'a mut GraphInteraction) {
         match event {

@@ -16,7 +16,6 @@ enum Message {
 }
 
 struct App {
-    theme: iced::Theme,
     graph: Graph,
 }
 
@@ -49,7 +48,6 @@ impl App {
 impl Default for App {
     fn default() -> Self {
         Self {
-            theme: iced::Theme::default(),
             graph: Graph::default(),
         }
     }
