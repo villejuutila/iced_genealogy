@@ -1,4 +1,3 @@
-mod context_menu;
 mod graph;
 
 use graph::{Graph, GraphMessage};
@@ -29,6 +28,7 @@ impl App {
                 GraphMessage::InsertNode(node) => {
                     self.graph.insert_node(node);
                 }
+                GraphMessage::MoveCursor(cursor_position) => self.graph.cursor_position = cursor_position,
             },
         }
     }
