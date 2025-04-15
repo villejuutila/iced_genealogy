@@ -1,15 +1,20 @@
 mod graph;
+mod side_panel;
 
 use std::time::Duration;
 
-use graph::{node::GenealogicalNode, Graph, GraphMessage};
+use graph::{
+    node::{GenealogicalNode, GraphNodeTrait, Sex},
+    Graph, GraphMessage,
+};
 use iced::{
     event, mouse, time,
-    widget::{button, column, container, row, text, text_input, Column},
-    Alignment, Border, Color, Element, Error, Event,
+    widget::{container, row},
+    Element, Error, Event,
     Length::Fill,
-    Point, Shadow, Subscription,
+    Subscription,
 };
+use side_panel::side_panel;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -17,6 +22,7 @@ enum Message {
     Graph(GraphMessage),
     Tick,
     UpdateNodeName((u128, String)),
+    SetNodeSex((u128, Sex)),
 }
 
 struct App {
@@ -30,23 +36,32 @@ impl App {
             Message::EventOccurred(event) => self.on_event(event),
             Message::Tick => self.graph.tick(),
             Message::UpdateNodeName((node_id, name)) => {
-                if let Some(node) = self.graph.nodes_mut().iter_mut().find(|node| node.id() == node_id) {
-                    if let graph::node::GraphNodeType::GenealogicalNode(genealogical_node) = node {
-                        genealogical_node.set_first_name(name);
-                    }
-                }
+                let graph::node::GraphNodeType::GenealogicalNode(node) = self.graph.get_node_mut_unsafe(Some(node_id));
+                node.set_first_name(name);
+            }
+            Message::SetNodeSex((node_id, sex)) => {
+                let graph::node::GraphNodeType::GenealogicalNode(node) = self.graph.get_node_mut_unsafe(Some(node_id));
+                node.set_sex(sex);
             }
             Message::Graph(graph_message) => match graph_message {
-                GraphMessage::InsertNode(point) => {
+                GraphMessage::UpdateBounds(bounds) => {
+                    self.graph.set_bounds(bounds);
+                }
+                GraphMessage::InsertNode(edge_node_id) => {
+                    println!("Insert node edge_node_id: {:?}", edge_node_id);
+                    let mut center = self.graph.bounds().center();
+                    if let Some(found_node) = self.graph.get_node(edge_node_id) {
+                        center = found_node.anchor();
+                        center.y += found_node.size().height * 2.0;
+                    }
+                    let new_node = GenealogicalNode::new(center);
+                    self.graph.add_edge_between_nodes(edge_node_id, new_node.id());
                     self.graph
-                        .insert_node(graph::node::GraphNodeType::GenealogicalNode(GenealogicalNode::new(
-                            point,
-                        )));
+                        .insert_node(graph::node::GraphNodeType::GenealogicalNode(new_node));
                 }
                 GraphMessage::MoveCursor(cursor_position) => self.graph.cursor_position = cursor_position,
                 GraphMessage::ClickNode((node_id, event)) => match event {
                     mouse::Event::ButtonPressed(mouse::Button::Left) => {
-                        println!("Clicked node: {}", node_id);
                         if self.selected_node.is_some() {
                             self.selected_node = None;
                             self.graph.deselect_node(node_id);
@@ -69,39 +84,12 @@ impl App {
     }
 
     fn view(&self) -> Element<Message> {
-        let mut side_panel_column = column![
-            text("Graph").color(Color::BLACK),
-            button(text("Add new").align_y(Alignment::Center))
-                .width(Fill)
-                .on_press(Message::Graph(GraphMessage::InsertNode(Point::new(0.0, 0.0))))
-        ];
-        if let Some(node_id) = self.selected_node {
-            let Some(graph::node::GraphNodeType::GenealogicalNode(selected_node)) =
-                self.graph.nodes().iter().find(|node| node.id() == node_id)
-            else {
-                return container(column![]).width(Fill).height(Fill).into();
-            };
-            let selected_node_widgets: Column<'_, Message> = column![text_input(
-                "Input persons name",
-                &selected_node.first_name().unwrap_or("".to_string()),
-            )
-            .on_input(move |input| Message::UpdateNodeName((node_id, input)))];
-            side_panel_column = side_panel_column.push(selected_node_widgets);
-        }
-        let side_panel = container(side_panel_column)
-            .width(300)
-            .padding(10)
-            .height(Fill)
-            .style(|_| container::Style {
-                background: Some(iced::Background::Color(Color::WHITE)),
-                shadow: Shadow { ..Default::default() },
-                border: Border {
-                    radius: 5.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
-        let content = row![self.graph.view().map(Message::Graph), side_panel];
+        let selected_node = self
+            .graph
+            .nodes()
+            .iter()
+            .find(|node| node.id() == self.selected_node.unwrap_or(0));
+        let content = row![self.graph.view().map(Message::Graph), side_panel(selected_node)];
 
         container(content).width(Fill).height(Fill).into()
     }
