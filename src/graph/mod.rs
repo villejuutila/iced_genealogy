@@ -1,18 +1,17 @@
-mod node;
+pub mod node;
 
 use iced::{
     event::Status,
     keyboard, mouse,
     widget::{
         canvas::{self, Frame, Path, Stroke},
-        text_input::cursor,
         Canvas,
     },
     Color, Element,
     Length::Fill,
     Point, Rectangle, Renderer, Size, Theme,
 };
-use node::GraphNode;
+use node::{GenealogicalNode, GraphNode, GraphNodeTrait, GraphNodeType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GraphInteraction {
@@ -28,18 +27,20 @@ impl Default for GraphInteraction {
     }
 }
 
+trait Test: GraphNodeTrait + Send + Clone + std::fmt::Debug {}
+
 #[derive(Debug, Clone)]
 pub enum GraphMessage {
-    InsertNode(GraphNode),
+    InsertNode(Point),
     MoveCursor(Point),
-    SelectNode(u128),
-    DeselectNode(u128),
+    ClickNode((u128, mouse::Event)), // SelectNode(u128),
+                                     // DeselectNode(u128),
 }
 
 pub struct Graph {
     pub cursor_position: Point,
     selected_node: Option<u128>,
-    nodes: Vec<GraphNode>,
+    nodes: Vec<GraphNodeType>,
     tick: u128,
 }
 
@@ -55,26 +56,47 @@ impl Default for Graph {
 }
 
 impl Graph {
+    pub fn nodes(&self) -> &Vec<GraphNodeType> {
+        &self.nodes
+    }
+    pub fn nodes_mut(&mut self) -> &mut Vec<GraphNodeType> {
+        &mut self.nodes
+    }
     pub fn selected_node(&self) -> Option<u128> {
         self.selected_node
     }
-    pub fn set_selected_node(&mut self, node_id: Option<u128>) {
-        self.selected_node = node_id;
+    pub fn set_selected_node(&mut self, node_id: u128) {
+        for node in self.nodes.iter_mut() {
+            if node.id() == node_id {
+                node.set_selected(true);
+            } else {
+                node.set_selected(false);
+            }
+        }
     }
+
+    pub fn deselect_node(&mut self, node_id: u128) {
+        for node in self.nodes.iter_mut() {
+            if node.id() == node_id {
+                node.set_selected(false);
+            }
+        }
+    }
+
     pub fn tick(&mut self) {
         self.tick += 1;
     }
 
-    pub fn toggle_node_selection(&mut self, node_id: u128) {
-        if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
-            node.selected = !node.selected;
-        }
-    }
+    // pub fn toggle_node_selection(&mut self, node_id: u128) {
+    //     if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
+    //         node.selected = !node.selected;
+    //     }
+    // }
     pub fn view(&self) -> Element<GraphMessage> {
         Canvas::new(self).width(Fill).height(Fill).into()
     }
 
-    pub fn insert_node(&mut self, node: GraphNode) {
+    pub fn insert_node(&mut self, node: GraphNodeType) {
         self.nodes.push(node);
     }
 
@@ -124,33 +146,30 @@ impl Graph {
         state: &'a mut GraphInteraction,
     ) -> (canvas::event::Status, Option<GraphMessage>, &'a mut GraphInteraction) {
         match event {
-            mouse::Event::ButtonReleased(button) => match button {
+            mouse::Event::ButtonPressed(button) => match button {
                 mouse::Button::Left => {
                     if state == &GraphInteraction::PhantomGraphNode {
-                        message = Some(GraphMessage::InsertNode(GraphNode::new(self.cursor_position)));
+                        message = Some(GraphMessage::InsertNode(self.cursor_position));
                         *state = GraphInteraction::None;
                         status = Status::Captured;
                         return (status, message, state);
                     }
 
                     self.nodes.iter().for_each(|node| {
-                        if node.is_inside(self.cursor_position) {
+                        if node.is_in_bounds(self.cursor_position) {
+                            println!("Clicked on node: {:?}", node);
                             *state = GraphInteraction::None;
-                            message = if node.selected {
-                                Some(GraphMessage::DeselectNode(node.id))
-                            } else {
-                                Some(GraphMessage::SelectNode(node.id))
-                            };
-                            status = Status::Captured;
-                        }
+                            message = Some(GraphMessage::ClickNode((node.id(), event)));
+                        };
+                        status = Status::Captured;
                     });
 
-                    self.nodes.iter().for_each(|node| {
-                        if let Some(anchor) = node.is_on_anchor(self.cursor_position) {
-                            *state = GraphInteraction::DrawPathFromNode((node.id, anchor));
-                            status = Status::Captured;
-                        }
-                    });
+                    // self.nodes.iter().for_each(|node| {
+                    //     if let Some(anchor) = node.is_on_anchor(self.cursor_position) {
+                    //         *state = GraphInteraction::DrawPathFromNode((node.id, anchor));
+                    //         status = Status::Captured;
+                    //     }
+                    // });
                 }
                 _ => {}
             },
@@ -164,22 +183,22 @@ impl Graph {
 impl canvas::Program<GraphMessage> for Graph {
     type State = GraphInteraction;
 
-    fn mouse_interaction(
-        &self,
-        _state: &Self::State,
-        _bounds: Rectangle,
-        _cursor: iced::advanced::mouse::Cursor,
-    ) -> iced::advanced::mouse::Interaction {
-        if self
-            .nodes
-            .iter()
-            .any(|node| node.is_on_anchor(self.cursor_position).is_some())
-        {
-            iced::advanced::mouse::Interaction::Pointer
-        } else {
-            iced::advanced::mouse::Interaction::Idle
-        }
-    }
+    // fn mouse_interaction(
+    //     &self,
+    //     _state: &Self::State,
+    //     _bounds: Rectangle,
+    //     _cursor: iced::advanced::mouse::Cursor,
+    // ) -> iced::advanced::mouse::Interaction {
+    //     if self
+    //         .nodes
+    //         .iter()
+    //         .any(|node| node.is_on_anchor(self.cursor_position).is_some())
+    //     {
+    //         iced::advanced::mouse::Interaction::Pointer
+    //     } else {
+    //         iced::advanced::mouse::Interaction::Idle
+    //     }
+    // }
 
     fn update(
         &self,
@@ -188,6 +207,7 @@ impl canvas::Program<GraphMessage> for Graph {
         _bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>) {
+        println!("cursor_position {:?}", self.cursor_position);
         let mut message = None;
         let status = Status::Ignored;
 
@@ -201,15 +221,15 @@ impl canvas::Program<GraphMessage> for Graph {
             None => return (status, message),
         };
 
-        if state != &GraphInteraction::PhantomGraphNode {
-            for node in &self.nodes {
-                if node.is_inside(cursor_position) {
-                    *state = GraphInteraction::HoverGraphNode(node.id);
-                } else {
-                    // *state = GraphInteraction::None;
-                }
-            }
-        }
+        // if state != &GraphInteraction::PhantomGraphNode {
+        //     for node in &self.nodes {
+        //         if node.is_inside(cursor_position) {
+        //             *state = GraphInteraction::HoverGraphNode(node.id);
+        //         } else {
+        //             // *state = GraphInteraction::None;
+        //         }
+        //     }
+        // }
 
         let (status, message, _) = self.on_event(event, state, message);
 
