@@ -5,10 +5,10 @@ use std::time::Duration;
 use graph::{Graph, GraphMessage};
 use iced::{
     event, time,
-    widget::{column, container},
-    Element, Error, Event,
+    widget::{column, container, row, text},
+    Border, Color, Element, Error, Event,
     Length::Fill,
-    Subscription,
+    Shadow, Subscription,
 };
 
 #[derive(Debug, Clone)]
@@ -33,6 +33,11 @@ impl App {
                 }
                 GraphMessage::MoveCursor(cursor_position) => self.graph.cursor_position = cursor_position,
                 GraphMessage::SelectNode(node_id) | GraphMessage::DeselectNode(node_id) => {
+                    if self.graph.selected_node() == Some(node_id) {
+                        self.graph.set_selected_node(None);
+                    } else {
+                        self.graph.set_selected_node(Some(node_id));
+                    }
                     self.graph.toggle_node_selection(node_id);
                 }
             },
@@ -40,7 +45,25 @@ impl App {
     }
 
     fn view(&self) -> Element<Message> {
-        let content = column![self.graph.view().map(Message::Graph)];
+        let mut content = row![self.graph.view().map(Message::Graph)];
+        let mut side_pane = None;
+        // if let Some(selected_node) = self.graph.selected_node() {
+        side_pane = Some(
+            container(column![text("Graph").color(Color::BLACK)])
+                .width(300)
+                .height(Fill)
+                .style(|_| container::Style {
+                    background: Some(iced::Background::Color(Color::WHITE)),
+                    shadow: Shadow { ..Default::default() },
+                    border: Border {
+                        radius: 5.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+        );
+        // }
+        let content = content.push_maybe(side_pane);
 
         container(content).width(Fill).height(Fill).into()
     }

@@ -38,6 +38,7 @@ pub enum GraphMessage {
 
 pub struct Graph {
     pub cursor_position: Point,
+    selected_node: Option<u128>,
     nodes: Vec<GraphNode>,
     tick: u128,
 }
@@ -48,11 +49,18 @@ impl Default for Graph {
             cursor_position: Point::ORIGIN,
             nodes: vec![],
             tick: 0,
+            selected_node: None,
         }
     }
 }
 
 impl Graph {
+    pub fn selected_node(&self) -> Option<u128> {
+        self.selected_node
+    }
+    pub fn set_selected_node(&mut self, node_id: Option<u128>) {
+        self.selected_node = node_id;
+    }
     pub fn tick(&mut self) {
         self.tick += 1;
     }
