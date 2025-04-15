@@ -1,8 +1,10 @@
 mod graph;
 
+use std::time::Duration;
+
 use graph::{Graph, GraphMessage};
 use iced::{
-    event,
+    event, time,
     widget::{column, container},
     Element, Error, Event,
     Length::Fill,
@@ -13,6 +15,7 @@ use iced::{
 enum Message {
     EventOccurred(Event),
     Graph(GraphMessage),
+    Tick,
 }
 
 struct App {
@@ -23,6 +26,7 @@ impl App {
     fn update(&mut self, message: Message) {
         match message {
             Message::EventOccurred(event) => self.on_event(event),
+            Message::Tick => self.graph.tick(),
             Message::Graph(graph_message) => match graph_message {
                 GraphMessage::InsertNode(node) => {
                     self.graph.insert_node(node);
@@ -42,7 +46,10 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::EventOccurred)
+        Subscription::batch(vec![
+            event::listen().map(Message::EventOccurred),
+            time::every(Duration::from_millis(100)).map(|_| Message::Tick),
+        ])
     }
 
     fn on_event(&mut self, _event: Event) {}

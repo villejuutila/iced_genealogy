@@ -34,11 +34,12 @@ impl GraphNode {
             && point.y <= self.anchor.y + self.size.height
     }
 
-    pub fn is_on_anchor(&self, point: Point) -> bool {
+    pub fn is_on_anchor(&self, point: Point) -> Option<Point> {
         let anchors = self.anchors();
         anchors
             .iter()
-            .any(|anchor| (point.x - anchor.x).abs() < ANCHOR_RADIUS && (point.y - anchor.y).abs() < ANCHOR_RADIUS)
+            .find(|anchor| (point.x - anchor.x).abs() < ANCHOR_RADIUS && (point.y - anchor.y).abs() < ANCHOR_RADIUS)
+            .cloned()
     }
 
     fn anchors(&self) -> Vec<Point> {

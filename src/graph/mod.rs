@@ -4,7 +4,8 @@ use iced::{
     event::Status,
     keyboard, mouse,
     widget::{
-        canvas::{self, Frame},
+        canvas::{self, Frame, Path, Stroke},
+        text_input::cursor,
         Canvas,
     },
     Color, Element,
@@ -18,6 +19,7 @@ pub enum GraphInteraction {
     None,
     HoverGraphNode(u128),
     PhantomGraphNode,
+    DrawPathFromNode((u128, Point)),
 }
 
 impl Default for GraphInteraction {
@@ -37,6 +39,7 @@ pub enum GraphMessage {
 pub struct Graph {
     pub cursor_position: Point,
     nodes: Vec<GraphNode>,
+    tick: u128,
 }
 
 impl Default for Graph {
@@ -44,11 +47,16 @@ impl Default for Graph {
         Self {
             cursor_position: Point::ORIGIN,
             nodes: vec![],
+            tick: 0,
         }
     }
 }
 
 impl Graph {
+    pub fn tick(&mut self) {
+        self.tick += 1;
+    }
+
     pub fn toggle_node_selection(&mut self, node_id: u128) {
         if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
             node.selected = !node.selected;
@@ -127,7 +135,14 @@ impl Graph {
                             };
                             status = Status::Captured;
                         }
-                    })
+                    });
+
+                    self.nodes.iter().for_each(|node| {
+                        if let Some(anchor) = node.is_on_anchor(self.cursor_position) {
+                            *state = GraphInteraction::DrawPathFromNode((node.id, anchor));
+                            status = Status::Captured;
+                        }
+                    });
                 }
                 _ => {}
             },
@@ -145,12 +160,12 @@ impl canvas::Program<GraphMessage> for Graph {
         &self,
         _state: &Self::State,
         _bounds: Rectangle,
-        cursor: iced::advanced::mouse::Cursor,
+        _cursor: iced::advanced::mouse::Cursor,
     ) -> iced::advanced::mouse::Interaction {
         if self
             .nodes
             .iter()
-            .any(|node| node.is_on_anchor(cursor.position().unwrap()))
+            .any(|node| node.is_on_anchor(self.cursor_position).is_some())
         {
             iced::advanced::mouse::Interaction::Pointer
         } else {
@@ -183,7 +198,7 @@ impl canvas::Program<GraphMessage> for Graph {
                 if node.is_inside(cursor_position) {
                     *state = GraphInteraction::HoverGraphNode(node.id);
                 } else {
-                    *state = GraphInteraction::None;
+                    // *state = GraphInteraction::None;
                 }
             }
         }
@@ -214,6 +229,40 @@ impl canvas::Program<GraphMessage> for Graph {
                     Size::new(100.0, 100.0),
                     Color { a: 0.2, ..Color::WHITE },
                 );
+            }
+            GraphInteraction::DrawPathFromNode((_, start)) => {
+                let cursor_position = self.cursor_position;
+                println!("cursor_position: {:?}", cursor_position);
+                println!("start: {:?}", start);
+                let mut dx = cursor_position.x - start.x;
+                let mut dy = cursor_position.y - start.y;
+                println!("dx: {}, dy: {}", dx, dy);
+                let mut length = (dx.abs().powf(2.0) + dy.abs().powf(2.0)).sqrt();
+                if length == 0.0 {
+                    dx = 1.0;
+                    dy = 1.0;
+                    length = 1.0;
+                }
+                println!("Length {}", length);
+                println!("X {}", start.x - (dx / length) * 5.0);
+                let center = Point::new(start.x - (dx / length) * 5.0, start.y - (dy / length) * 5.0);
+                println!("center: {:?}", center);
+                let x_distance = (cursor_position.x - start.x).abs();
+                let y_distance = (cursor_position.y - start.y).abs();
+                let c = if x_distance < y_distance {
+                    Point::new(center.x, cursor_position.y)
+                } else {
+                    Point::new(cursor_position.x, center.y)
+                };
+                let path_1 = Path::line(*start, c);
+                let path_2 = Path::line(c, cursor_position);
+                let mut color = Color::WHITE;
+                if self.tick & 1 == 0 {
+                    color.a = 0.1;
+                }
+                let stroke = Stroke::default().with_color(color).with_width(1.0);
+                frame.stroke(&path_1, stroke);
+                frame.stroke(&path_2, stroke);
             }
             _ => {}
         };
