@@ -2,7 +2,8 @@ pub mod node;
 
 use iced::{
     event::Status,
-    keyboard, mouse,
+    keyboard,
+    mouse::{self, ScrollDelta},
     widget::{
         canvas::{self, Frame, Path, Stroke},
         Canvas,
@@ -11,25 +12,30 @@ use iced::{
     Length::Fill,
     Point, Rectangle, Renderer, Size, Theme,
 };
-use node::{GraphNodeTrait, GraphNodeType};
+use node::GraphNodeType;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum GraphInteraction {
-    None,
-    HoverGraphNode(u128),
-    PhantomGraphNode,
+pub struct GraphState {
+    cursor_position: Point,
+    scale: f32,
+    offset_x: f32,
+    offset_y: f32,
 }
 
-impl Default for GraphInteraction {
+impl Default for GraphState {
     fn default() -> Self {
-        Self::None
+        Self {
+            cursor_position: Point::ORIGIN,
+            scale: 1.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum GraphMessage {
     InsertNode(Option<u128>),
-    MoveCursor(Point),
     ClickNode((u128, mouse::Event)),
     UpdateBounds(Rectangle),
 }
@@ -44,7 +50,6 @@ pub struct Edge {
 
 pub struct Graph {
     pub cursor_position: Point,
-    selected_node: Option<u128>,
     nodes: Vec<GraphNodeType>,
     tick: u128,
     bounds: Rectangle,
@@ -57,7 +62,6 @@ impl Default for Graph {
             cursor_position: Point::ORIGIN,
             nodes: vec![],
             tick: 0,
-            selected_node: None,
             bounds: Rectangle::new(Point::ORIGIN, Size::new(0.0, 0.0)),
             edges: vec![],
         }
@@ -100,12 +104,6 @@ impl Graph {
     pub fn nodes(&self) -> &Vec<GraphNodeType> {
         &self.nodes
     }
-    pub fn nodes_mut(&mut self) -> &mut Vec<GraphNodeType> {
-        &mut self.nodes
-    }
-    pub fn selected_node(&self) -> Option<u128> {
-        self.selected_node
-    }
     pub fn set_selected_node(&mut self, node_id: u128) {
         for node in self.nodes.iter_mut() {
             if node.id() == node_id {
@@ -139,9 +137,9 @@ impl Graph {
     pub fn on_event<'c>(
         &self,
         event: canvas::Event,
-        state: &'c mut GraphInteraction,
+        state: &'c mut GraphState,
         message: Option<GraphMessage>,
-    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphInteraction) {
+    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphState) {
         let status = Status::Ignored;
 
         match event {
@@ -158,17 +156,10 @@ impl Graph {
         &self,
         event: keyboard::Event,
         message: Option<GraphMessage>,
-        mut status: Status,
-        state: &'c mut GraphInteraction,
-    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphInteraction) {
+        status: Status,
+        state: &'c mut GraphState,
+    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphState) {
         match event {
-            keyboard::Event::KeyPressed { key, .. } => match key.as_ref() {
-                keyboard::Key::Character("n") => {
-                    *state = GraphInteraction::PhantomGraphNode;
-                    status = Status::Captured;
-                }
-                _ => {}
-            },
             _ => {}
         }
 
@@ -179,14 +170,27 @@ impl Graph {
         event: mouse::Event,
         mut message: Option<GraphMessage>,
         mut status: Status,
-        state: &'c mut GraphInteraction,
-    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphInteraction) {
+        state: &'c mut GraphState,
+    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphState) {
         match event {
+            mouse::Event::CursorMoved { position } => {
+                state.cursor_position = self.to_canvas_point(state, position);
+            }
+            mouse::Event::WheelScrolled { delta } => {
+                let y = match delta {
+                    ScrollDelta::Lines { x: _, y } => y,
+                    ScrollDelta::Pixels { x: _, y } => y,
+                };
+                println!("delta: {:?}", delta);
+                status = Status::Captured;
+                let scale_amount = -y / 500.0;
+                println!("scale_amount: {}", scale_amount);
+                state.scale = state.scale * (1.0 + scale_amount);
+            }
             mouse::Event::ButtonPressed(button) => match button {
                 mouse::Button::Left => {
                     self.nodes.iter().for_each(|node| {
                         if node.is_in_bounds(self.cursor_position) {
-                            *state = GraphInteraction::None;
                             message = Some(GraphMessage::ClickNode((node.id(), event)));
                         };
                         status = Status::Captured;
@@ -199,30 +203,56 @@ impl Graph {
 
         (status, message, state)
     }
+
+    fn to_canvas_point(&self, state: &GraphState, point: Point) -> Point {
+        Point::new(self.to_canvas_x(state, point.x), self.to_canvas_y(state, point.y))
+    }
+
+    #[allow(dead_code)]
+    fn to_window_point(&self, state: &GraphState, point: Point) -> Point {
+        Point::new(self.to_window_x(state, point.x), self.to_window_y(state, point.y))
+    }
+
+    fn to_canvas_x(&self, state: &GraphState, window_x: f32) -> f32 {
+        (window_x + state.offset_x) * state.scale
+    }
+
+    fn to_canvas_y(&self, state: &GraphState, window_y: f32) -> f32 {
+        (window_y + state.offset_y) * state.scale
+    }
+    #[allow(dead_code)]
+    fn to_window_x(&self, state: &GraphState, canvas_x: f32) -> f32 {
+        canvas_x / state.scale - state.offset_x
+    }
+
+    #[allow(dead_code)]
+    fn to_window_y(&self, state: &GraphState, canvas_y: f32) -> f32 {
+        canvas_y / state.scale - state.offset_y
+    }
+
+    #[allow(dead_code)]
+    fn true_height(&self, state: &GraphState) -> f32 {
+        self.bounds.height / state.scale
+    }
+
+    #[allow(dead_code)]
+    fn true_width(&self, state: &GraphState) -> f32 {
+        self.bounds.width / state.scale
+    }
 }
 
 impl canvas::Program<GraphMessage> for Graph {
-    type State = GraphInteraction;
+    type State = GraphState;
 
     fn update(
         &self,
         state: &mut Self::State,
         event: canvas::Event,
         bounds: Rectangle,
-        cursor: mouse::Cursor,
+        _cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>) {
         let mut message = None;
-        let status = Status::Ignored;
 
-        let cursor_position = match cursor.position() {
-            Some(cursor_position) => {
-                if cursor_position != self.cursor_position {
-                    message = Some(GraphMessage::MoveCursor(cursor_position));
-                }
-                cursor_position
-            }
-            None => return (status, message),
-        };
         if bounds != self.bounds {
             message = Some(GraphMessage::UpdateBounds(bounds));
         }
@@ -234,18 +264,21 @@ impl canvas::Program<GraphMessage> for Graph {
 
     fn draw(
         &self,
-        interaction: &GraphInteraction,
+        state: &GraphState,
         renderer: &Renderer,
         _theme: &Theme,
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
-
+        println!("real cursor_position: {:#?}", _cursor.position());
+        println!("canvas cursor_position{}", state.cursor_position);
+        println!("Scale : {}", state.scale);
+        frame.scale(state.scale);
         for edge in self.edges() {
             let start = self.get_node_unsafe(Some(edge.start));
             let end = self.get_node_unsafe(Some(edge.end));
-            let start_above = start.anchor().y <= end.anchor().y;
+            // let start_above = start.anchor().y <= end.anchor().y;
             let start_point = Point::new(
                 start.anchor().x + start.size().width / 2.0,
                 start.anchor().y + start.size().height,
@@ -257,47 +290,8 @@ impl canvas::Program<GraphMessage> for Graph {
             frame.stroke(&path, Stroke::default().with_width(2.0).with_color(Color::WHITE));
         }
         for node in self.nodes.iter() {
-            node.draw(&mut frame, interaction);
+            node.draw(&mut frame);
         }
-
-        match interaction {
-            GraphInteraction::PhantomGraphNode => {
-                frame.fill_rectangle(
-                    self.cursor_position,
-                    Size::new(100.0, 100.0),
-                    Color { a: 0.2, ..Color::WHITE },
-                );
-            }
-            // GraphInteraction::DrawPathFromNode((_, start)) => {
-            //     let cursor_position = self.cursor_position;
-            //     let mut dx = cursor_position.x - start.x;
-            //     let mut dy = cursor_position.y - start.y;
-            //     let mut length = (dx.abs().powf(2.0) + dy.abs().powf(2.0)).sqrt();
-            //     if length == 0.0 {
-            //         dx = 1.0;
-            //         dy = 1.0;
-            //         length = 1.0;
-            //     }
-            //     let center = Point::new(start.x - (dx / length) * 5.0, start.y - (dy / length) * 5.0);
-            //     let x_distance = (cursor_position.x - start.x).abs();
-            //     let y_distance = (cursor_position.y - start.y).abs();
-            //     let c = if x_distance < y_distance {
-            //         Point::new(center.x, cursor_position.y)
-            //     } else {
-            //         Point::new(cursor_position.x, center.y)
-            //     };
-            //     let path_1 = Path::line(*start, c);
-            //     let path_2 = Path::line(c, cursor_position);
-            //     let mut color = Color::WHITE;
-            //     if self.tick & 1 == 0 {
-            //         color.a = 0.1;
-            //     }
-            //     let stroke = Stroke::default().with_color(color).with_width(1.0);
-            //     frame.stroke(&path_1, stroke);
-            //     frame.stroke(&path_2, stroke);
-            // }
-            _ => {}
-        };
         vec![frame.into_geometry()]
     }
 }
