@@ -1,11 +1,12 @@
 pub mod node;
 
 use iced::{
+    advanced::graphics::geometry::frame::Backend,
     event::Status,
     keyboard,
     mouse::{self, ScrollDelta},
     widget::{
-        canvas::{self, Frame, Path, Program, Stroke},
+        canvas::{self, Frame, Path, Stroke},
         Canvas,
     },
     Color, Element,
@@ -53,7 +54,6 @@ pub struct Edge {
 // impl Edge {}
 
 pub struct Graph {
-    pub cursor_position: Point,
     nodes: Vec<GraphNodeType>,
     tick: u128,
     bounds: Rectangle,
@@ -63,7 +63,6 @@ pub struct Graph {
 impl Default for Graph {
     fn default() -> Self {
         Self {
-            cursor_position: Point::ORIGIN,
             nodes: vec![],
             tick: 0,
             bounds: Rectangle::new(Point::ORIGIN, Size::new(0.0, 0.0)),
@@ -143,12 +142,11 @@ impl Graph {
         event: canvas::Event,
         state: &'c mut GraphState,
         message: Option<GraphMessage>,
-        cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphState) {
         let status = Status::Ignored;
 
         match event {
-            canvas::Event::Mouse(mouse_event) => self.on_mouse_event(mouse_event, message, status, state, cursor),
+            canvas::Event::Mouse(mouse_event) => self.on_mouse_event(mouse_event, message, status, state),
             canvas::Event::Keyboard(keyboard_event) => self.on_keyboard_event(keyboard_event, message, status, state),
             _ => {
                 println!("Unhandled event: {:?}", event);
@@ -177,7 +175,6 @@ impl Graph {
         mut message: Option<GraphMessage>,
         mut status: Status,
         state: &'c mut GraphState,
-        cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphState) {
         match event {
             mouse::Event::CursorMoved { position } => {
@@ -244,19 +241,12 @@ impl Graph {
     fn to_canvas_y(&self, state: &GraphState, window_y: f32) -> f32 {
         (window_y + state.offset_y) * state.scale
     }
-    #[allow(dead_code)]
+
     fn to_window_x(&self, state: &GraphState, canvas_x: f32) -> f32 {
-        println!("canvas_x: {}", canvas_x);
-        println!("state.scale: {}", state.scale);
-        println!("state.offset_x: {}", state.offset_x);
         (canvas_x / state.scale) - state.offset_x
     }
 
-    #[allow(dead_code)]
     fn to_window_y(&self, state: &GraphState, canvas_y: f32) -> f32 {
-        println!("canvas_y: {}", canvas_y);
-        println!("state.scale: {}", state.scale);
-        println!("state.offset_y: {}", state.offset_y);
         (canvas_y / state.scale) - state.offset_y
     }
 
@@ -286,7 +276,7 @@ impl canvas::Program<GraphMessage> for Graph {
         state: &mut Self::State,
         event: canvas::Event,
         bounds: Rectangle,
-        cursor: mouse::Cursor,
+        _cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>) {
         let mut message = None;
 
@@ -294,7 +284,7 @@ impl canvas::Program<GraphMessage> for Graph {
             message = Some(GraphMessage::UpdateBounds(bounds));
         }
 
-        let (status, message, _) = self.on_event(event, state, message, cursor);
+        let (status, message, _) = self.on_event(event, state, message);
         state.prev_cursor_position = state.cursor_position;
         (status, message)
     }
@@ -308,30 +298,27 @@ impl canvas::Program<GraphMessage> for Graph {
         _cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
-        // println!("panning: {}", state.panning);
-        // println!("real cursor_position: {:#?}", _cursor.position());
-        // println!("canvas cursor_position{}", state.cursor_position);
-        // println!("prev_cursor_position: {}", state.prev_cursor_position);
-        // println!("Scale : {}", state.scale);
-        // println!("offset_x: {}", state.offset_x);
-        // println!("offset_y: {}", state.offset_y);
         frame.scale(state.scale);
+        for node in self.nodes.iter() {
+            node.draw(&mut frame, &self, &state);
+        }
         for edge in self.edges() {
             let start = self.get_node_unsafe(Some(edge.start));
             let end = self.get_node_unsafe(Some(edge.end));
             // let start_above = start.anchor().y <= end.anchor().y;
-            let start_point = Point::new(
-                start.anchor().x + start.size().width / 2.0,
-                start.anchor().y + start.size().height,
+            let start_point = self.to_canvas_point(
+                state,
+                Point::new(
+                    start.anchor().x + start.size().width / 2.0,
+                    start.anchor().y + start.size().height,
+                ),
             );
-            let end_point = Point::new(end.anchor().x + end.size().width / 2.0, end.anchor().y);
-            println!("start: {:#?}", start_point);
-            println!("end: {:#?}", end_point);
+            let end_point = self.to_canvas_point(
+                state,
+                Point::new(end.anchor().x + end.size().width / 2.0, end.anchor().y),
+            );
             let path = Path::line(start_point, end_point);
             frame.stroke(&path, Stroke::default().with_width(2.0).with_color(Color::WHITE));
-        }
-        for node in self.nodes.iter() {
-            node.draw(&mut frame, &self, &state);
         }
         let mut st = *state;
         self.on_draw(&mut st);
