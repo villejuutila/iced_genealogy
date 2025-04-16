@@ -212,8 +212,9 @@ impl Graph {
                     status = Status::Captured;
                 }
                 mouse::Button::Left => {
+                    println!("Test: {}", self.to_window_point(state, state.cursor_position));
                     self.nodes.iter().for_each(|node| {
-                        if node.is_in_bounds(self.to_window_point(state, self.cursor_position)) {
+                        if node.is_in_bounds(self.to_window_point(state, state.cursor_position)) {
                             message = Some(GraphMessage::ClickNode((node.id(), event)));
                         };
                         status = Status::Captured;
@@ -245,12 +246,18 @@ impl Graph {
     }
     #[allow(dead_code)]
     fn to_window_x(&self, state: &GraphState, canvas_x: f32) -> f32 {
-        canvas_x / state.scale - state.offset_x
+        println!("canvas_x: {}", canvas_x);
+        println!("state.scale: {}", state.scale);
+        println!("state.offset_x: {}", state.offset_x);
+        (canvas_x / state.scale) - state.offset_x
     }
 
     #[allow(dead_code)]
     fn to_window_y(&self, state: &GraphState, canvas_y: f32) -> f32 {
-        canvas_y / state.scale - state.offset_y
+        println!("canvas_y: {}", canvas_y);
+        println!("state.scale: {}", state.scale);
+        println!("state.offset_y: {}", state.offset_y);
+        (canvas_y / state.scale) - state.offset_y
     }
 
     #[allow(dead_code)]
@@ -303,8 +310,8 @@ impl canvas::Program<GraphMessage> for Graph {
         let mut frame = Frame::new(renderer, bounds.size());
         // println!("panning: {}", state.panning);
         // println!("real cursor_position: {:#?}", _cursor.position());
-        println!("canvas cursor_position{}", state.cursor_position);
-        println!("prev_cursor_position: {}", state.prev_cursor_position);
+        // println!("canvas cursor_position{}", state.cursor_position);
+        // println!("prev_cursor_position: {}", state.prev_cursor_position);
         // println!("Scale : {}", state.scale);
         // println!("offset_x: {}", state.offset_x);
         // println!("offset_y: {}", state.offset_y);
