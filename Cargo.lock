@@ -1330,6 +1330,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "graph"
+version = "0.1.0"
+dependencies = [
+ "iced",
+ "iced_aw",
+ "uuid",
+]
+
+[[package]]
 name = "guillotiere"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1454,6 +1463,7 @@ dependencies = [
 name = "iced-graph"
 version = "0.1.0"
 dependencies = [
+ "graph",
  "iced",
  "iced_aw",
  "uuid",

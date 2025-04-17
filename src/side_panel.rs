@@ -1,3 +1,10 @@
+use graph::{
+    node::{
+        genealogical_node::{GenealogicalNode, Sex},
+        GraphNodeTrait,
+    },
+    GraphMessage,
+};
 use iced::{
     widget::{button, checkbox, column, container, text, text_input, Column, Container},
     Background, Border, Color,
@@ -5,20 +12,14 @@ use iced::{
     Shadow,
 };
 
-use crate::{
-    graph::node::{
-        genealogical_node::{GenealogicalNode, Sex},
-        GraphNodeTrait,
-    },
-    Message,
-};
+use crate::Message;
 
 pub fn side_panel<'a>(selected_node: Option<&'a GenealogicalNode>) -> Container<'a, Message> {
     let mut root = column![
         text("Graph").color(Color::BLACK),
         button("Add new")
             .width(Fill)
-            .on_press(Message::Graph(crate::graph::GraphMessage::InsertNode(None)))
+            .on_press(Message::Graph(GraphMessage::InsertNode(None)))
     ];
 
     if let Some(selected_node) = selected_node {
@@ -57,7 +58,7 @@ fn select_node_content<'a>(mut root: Column<'a, Message>, node: &'a Genealogical
             .on_toggle(|checked| { Message::SetNodeSex((node.id(), if checked { Sex::Female } else { Sex::Male })) }),
         button("Add offspring")
             .width(Fill)
-            .on_press(Message::Graph(crate::graph::GraphMessage::InsertNode(Some(node.id())))),
+            .on_press(Message::Graph(GraphMessage::InsertNode(Some(node.id())))),
     ];
     root = root.push(selected_node_widgets);
     root

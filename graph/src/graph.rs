@@ -1,5 +1,3 @@
-pub mod node;
-
 use iced::{
     event::Status,
     mouse::{self},
@@ -11,8 +9,8 @@ use iced::{
     Length::Fill,
     Point, Rectangle, Renderer, Size, Theme, Vector,
 };
-use node::GraphNodeTrait;
-// use node_old::GraphNodeType;
+
+use crate::node::GraphNodeTrait;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GraphInteraction {

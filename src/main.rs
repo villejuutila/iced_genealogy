@@ -1,4 +1,3 @@
-mod graph;
 mod side_panel;
 
 use std::time::Duration;
