@@ -46,7 +46,10 @@ impl App {
             }
             Message::OpenFile => {
                 return Task::perform(
-                    AsyncFileDialog::new().set_directory(current_dir().unwrap()).pick_file(),
+                    AsyncFileDialog::new()
+                        .set_directory(current_dir().unwrap())
+                        .add_filter("", &["GED"])
+                        .pick_file(),
                     |handle| Message::OpenFileResult(handle),
                 )
             }
