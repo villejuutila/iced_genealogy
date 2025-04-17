@@ -2,7 +2,7 @@ use iced::{
     event::Status,
     mouse::{self},
     widget::{
-        canvas::{self, Frame, Path, Stroke},
+        canvas::{self, Cache, Path, Stroke},
         Canvas,
     },
     Color, Element,
@@ -54,6 +54,7 @@ pub struct Graph<T: GraphNodeTrait> {
     scaling: f32,
     translation: Vector,
     selected_node: Option<u128>,
+    cache: Cache,
 }
 
 impl<T: GraphNodeTrait> Default for Graph<T> {
@@ -66,6 +67,7 @@ impl<T: GraphNodeTrait> Default for Graph<T> {
             scaling: 1.0,
             translation: Vector::default(),
             selected_node: None,
+            cache: Cache::default(),
         }
     }
 }
@@ -178,6 +180,7 @@ impl<T: GraphNodeTrait> Graph<T> {
                 let new_node = T::new(center);
                 self.add_edge_between_nodes(edge_node_id, new_node.id());
                 self.insert_node(new_node);
+                self.cache.clear();
             }
             GraphMessage::DraggingNode(id, offset) => {
                 let node = self.get_node_mut_unsafe(Some(id));
@@ -295,7 +298,7 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
             },
             _ => {}
         }
-
+        self.cache.clear();
         (status, message)
     }
 
@@ -308,32 +311,31 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
         _cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let center = Vector::new(bounds.width / 2.0, bounds.height / 2.0);
-        let mut frame = Frame::new(renderer, bounds.size());
-        frame.with_save(|mut frame| {
-            frame.translate(center);
-            frame.scale(self.scaling);
-            frame.translate(self.translation);
-            for node in self.nodes.iter() {
-                let hovered = if let GraphInteraction::HoverNode(id) = *interaction {
-                    id == node.id()
-                } else {
-                    false
-                };
-                node.draw(&mut frame, hovered);
-            }
-            for edge in self.edges() {
-                let start = self.get_node_unsafe(Some(edge.start));
-                let end = self.get_node_unsafe(Some(edge.end));
-                // let start_above = start.anchor().y <= end.anchor().y;
-                let start_point = Point::new(
-                    start.anchor().x + start.size().width / 2.0,
-                    start.anchor().y + start.size().height,
-                );
-                let end_point = Point::new(end.anchor().x + end.size().width / 2.0, end.anchor().y);
-                let path = Path::line(start_point, end_point);
-                frame.stroke(&path, Stroke::default().with_width(2.0).with_color(Color::WHITE));
-            }
-        });
-        vec![frame.into_geometry()]
+        vec![self.cache.draw(renderer, bounds.size(), |frame| {
+            frame.with_save(|mut frame| {
+                frame.translate(center);
+                frame.scale(self.scaling);
+                frame.translate(self.translation);
+                for node in self.nodes.iter() {
+                    let hovered = if let GraphInteraction::HoverNode(id) = *interaction {
+                        id == node.id()
+                    } else {
+                        false
+                    };
+                    node.draw(&mut frame, hovered);
+                }
+                for edge in self.edges() {
+                    let start = self.get_node_unsafe(Some(edge.start));
+                    let end = self.get_node_unsafe(Some(edge.end));
+                    let start_point = Point::new(
+                        start.anchor().x + start.size().width / 2.0,
+                        start.anchor().y + start.size().height,
+                    );
+                    let end_point = Point::new(end.anchor().x + end.size().width / 2.0, end.anchor().y);
+                    let path = Path::line(start_point, end_point);
+                    frame.stroke(&path, Stroke::default().with_width(2.0).with_color(Color::WHITE));
+                }
+            })
+        })]
     }
 }
