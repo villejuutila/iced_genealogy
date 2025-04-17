@@ -1,8 +1,9 @@
 mod genealogical_node;
 mod side_panel;
 
-use std::{env::current_dir, time::Duration};
+use std::{env::current_dir, fs::File, io::Read, time::Duration};
 
+use gedcom::parse;
 use genealogical_node::{GenealogicalNode, Sex};
 use graph::{Graph, GraphMessage};
 use iced::{
@@ -53,7 +54,17 @@ impl App {
                 )
             }
             Message::OpenFileResult(handle) => {
-                println!("File handle: {:?}", handle);
+                if let Some(handle) = handle {
+                    let mut file = File::open(handle.path()).unwrap();
+                    let mut content = String::new();
+                    file.read_to_string(&mut content).unwrap();
+                    let res = parse(content.chars());
+                    return Task::batch(
+                        res.individuals
+                            .iter()
+                            .map(|ind| Task::done(Message::Graph(GraphMessage::InsertNode(None)))),
+                    );
+                }
             }
             Message::Graph(graph_message) => self.graph.update(graph_message),
         }

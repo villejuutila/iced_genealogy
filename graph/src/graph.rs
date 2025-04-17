@@ -54,6 +54,7 @@ pub struct Graph<T: GraphNodeTrait> {
     scaling: f32,
     translation: Vector,
     selected_node: Option<u128>,
+    dragging: bool,
     cache: Cache,
 }
 
@@ -64,6 +65,7 @@ impl<T: GraphNodeTrait> Default for Graph<T> {
             tick: 0,
             bounds: Rectangle::new(Point::ORIGIN, Size::new(0.0, 0.0)),
             edges: vec![],
+            dragging: false,
             scaling: 1.0,
             translation: Vector::default(),
             selected_node: None,
@@ -169,7 +171,13 @@ impl<T: GraphNodeTrait> Graph<T> {
                 self.translation = translation;
             }
             GraphMessage::ClickNode((node_id, _)) => {
-                self.set_selected_node(node_id);
+                if self.selected_node == Some(node_id) {
+                    println!("Deselecting node {}", node_id);
+                    self.selected_node = None;
+                } else {
+                    println!("Selecting node {}", node_id);
+                    self.selected_node = Some(node_id);
+                }
             }
             GraphMessage::InsertNode(edge_node_id) => {
                 let mut center = self.project(self.bounds().center(), self.bounds().size());

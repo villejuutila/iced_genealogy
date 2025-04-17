@@ -5,7 +5,7 @@ edition = "2021"
 
 [workspace]
 resolver = "2"
-members = ["graph"]
+members = [ "graph"]
 
 [dependencies]
 iced = { version = "0.13.1", features = ["canvas", "tokio", "wgpu"] }
@@ -13,3 +13,4 @@ iced_aw = "0.12.2"
 uuid = { version = "1.16.0", features = ["v4"] }
 graph = { path = "graph" }
 rfd = "0.15.3"
+gedcom = "0.2.2"
