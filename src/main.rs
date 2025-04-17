@@ -44,6 +44,7 @@ impl App {
                 node.set_sex(sex);
             }
             Message::Graph(graph_message) => match graph_message {
+                GraphMessage::Scaled(_, _) | GraphMessage::Translated(_) => self.graph.update(graph_message),
                 GraphMessage::UpdateBounds(bounds) => {
                     self.graph.set_bounds(bounds);
                 }

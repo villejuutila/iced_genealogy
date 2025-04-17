@@ -12,7 +12,7 @@ pub trait GraphNodeTrait {
     fn size(&self) -> Size;
     fn selected(&self) -> bool;
     fn set_selected(&mut self, selected: bool);
-    fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph, state: &GraphState) -> Vec<&'a Frame>;
+    fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph) -> Vec<&'a Frame>;
     fn is_in_bounds(&self, point: Point) -> bool {
         let anchor = self.anchor();
         let size = self.size();
@@ -60,9 +60,9 @@ impl GraphNodeType {
             GraphNodeType::GenealogicalNode(node) => node.is_in_bounds(point),
         }
     }
-    pub fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph, state: &GraphState) -> Vec<&'a Frame> {
+    pub fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph) -> Vec<&'a Frame> {
         match self {
-            GraphNodeType::GenealogicalNode(node) => node.draw(frame, graph, state),
+            GraphNodeType::GenealogicalNode(node) => node.draw(frame, graph),
         }
     }
 }
@@ -138,14 +138,14 @@ impl GraphNodeTrait for GenealogicalNode {
         self.selected = selected;
     }
 
-    fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph, state: &GraphState) -> Vec<&'a Frame> {
+    fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph) -> Vec<&'a Frame> {
         // let hovered = interaction == &GraphInteraction::HoverGraphNode(self.id);
         let color = if self.selected() {
             Color { a: 0.5, ..Color::WHITE }
         } else {
             Color::WHITE
         };
-        frame.fill_rectangle(graph.to_canvas_point(state, self.anchor), self.size, color);
+        frame.fill_rectangle(self.anchor, self.size, color);
         if let Some(sex) = self.sex() {
             let border_color = if sex == Sex::Male {
                 Color::from_rgb(0.0, 0.0, 255.0)
@@ -153,7 +153,7 @@ impl GraphNodeTrait for GenealogicalNode {
                 Color::from_rgb(255.0, 0.0, 0.0)
             };
             frame.stroke_rectangle(
-                graph.to_canvas_point(state, self.anchor),
+                self.anchor,
                 self.size,
                 Stroke::default().with_width(2.0).with_color(border_color),
             );
@@ -174,7 +174,7 @@ impl GraphNodeTrait for GenealogicalNode {
                 g: 0.,
                 b: 0.,
             },
-            position: graph.to_canvas_point(state, self.text_position()),
+            position: self.text_position(),
             vertical_alignment: iced::alignment::Vertical::Center,
             horizontal_alignment: iced::alignment::Horizontal::Center,
             ..Default::default()
