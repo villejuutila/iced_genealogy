@@ -1,6 +1,6 @@
 mod side_panel;
 
-use std::time::Duration;
+use std::{env::current_dir, time::Duration};
 
 use graph::{
     node::genealogical_node::{GenealogicalNode, Sex},
@@ -11,8 +11,9 @@ use iced::{
     widget::{container, row},
     Element, Error, Event,
     Length::Fill,
-    Subscription,
+    Subscription, Task,
 };
+use rfd::{AsyncFileDialog, FileHandle};
 use side_panel::side_panel;
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,8 @@ enum Message {
     Tick,
     UpdateNodeName((u128, String)),
     SetNodeSex((u128, Sex)),
+    OpenFile,
+    OpenFileResult(Option<FileHandle>),
 }
 
 struct App {
@@ -29,7 +32,7 @@ struct App {
 }
 
 impl App {
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::EventOccurred(event) => self.on_event(event),
             Message::Tick => self.graph.tick(),
@@ -41,8 +44,18 @@ impl App {
                 let node = self.graph.get_node_mut_unsafe(Some(node_id));
                 node.set_sex(sex);
             }
+            Message::OpenFile => {
+                return Task::perform(
+                    AsyncFileDialog::new().set_directory(current_dir().unwrap()).pick_file(),
+                    |handle| Message::OpenFileResult(handle),
+                )
+            }
+            Message::OpenFileResult(handle) => {
+                println!("File handle: {:?}", handle);
+            }
             Message::Graph(graph_message) => self.graph.update(graph_message),
         }
+        Task::none()
     }
 
     fn view(&self) -> Element<Message> {
