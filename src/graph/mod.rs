@@ -74,6 +74,14 @@ impl Default for Graph {
 impl Graph {
     const MIN_SCALING: f32 = 0.1;
     const MAX_SCALING: f32 = 2.0;
+    const GRID_SIZE: f32 = 32.0;
+
+    fn snap_to_grid(pos: Point) -> Point {
+        Point::new(
+            (pos.x / Self::GRID_SIZE).round() * Self::GRID_SIZE,
+            (pos.y / Self::GRID_SIZE).round() * Self::GRID_SIZE,
+        )
+    }
 
     fn visible_region(&self, size: Size) -> Region {
         let width = size.width / self.scaling;
@@ -174,7 +182,7 @@ impl Graph {
             }
             GraphMessage::DraggingNode(id, offset) => {
                 let node = self.get_node_mut_unsafe(Some(id));
-                node.set_anchor(offset);
+                node.set_anchor(Self::snap_to_grid(offset));
             }
         }
     }
@@ -268,12 +276,13 @@ impl canvas::Program<GraphMessage> for Graph {
                     }
                     mouse::Button::Left => {
                         if let GraphInteraction::HoverNode(id) = *interaction {
-                            message = Some(GraphMessage::ClickNode((id, mouse_event)));
-                            status = Status::Captured;
-                        }
-                        if let Some(selected_node) = self.selected_node {
-                            *interaction = GraphInteraction::DraggingNode(selected_node);
-                            status = Status::Captured;
+                            if let Some(selected_node) = self.selected_node {
+                                *interaction = GraphInteraction::DraggingNode(selected_node);
+                                status = Status::Captured;
+                            } else {
+                                message = Some(GraphMessage::ClickNode((id, mouse_event)));
+                                status = Status::Captured;
+                            }
                         }
                     }
                     _ => {}
@@ -294,11 +303,11 @@ impl canvas::Program<GraphMessage> for Graph {
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
+        println!("interaction: {:?}", interaction);
         let hovered_node = cursor.position_in(bounds).map_or(None, |cursor_position| {
             let canvas_position = self.window_to_canvas(cursor_position, bounds);
             self.nodes.iter().find(|node| node.is_in_bounds(canvas_position))
         });
-        println!("Hovered node: {:#?}", hovered_node);
         let center = Vector::new(bounds.width / 2.0, bounds.height / 2.0);
         let mut frame = Frame::new(renderer, bounds.size());
         frame.with_save(|mut frame| {
