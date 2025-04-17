@@ -18,7 +18,7 @@ pub enum GraphInteraction {
     None,
     Panning { translation: Vector, start: Point },
     HoverNode(u128),
-    DraggingNode(u128),
+    DraggingNode(u128, Point),
 }
 
 impl Default for GraphInteraction {
@@ -213,10 +213,12 @@ impl canvas::Program<GraphMessage> for Graph {
         match event {
             canvas::Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { position } => match *interaction {
-                    GraphInteraction::DraggingNode(id) => {
-                        let offset = self.window_to_canvas(position, bounds);
-                        message = Some(GraphMessage::DraggingNode(id, Point::new(offset.x, offset.y)));
-                        status = Status::Captured;
+                    GraphInteraction::DraggingNode(id, starting_point) => {
+                        if (starting_point - position).x.abs() > 1.0 && (starting_point - position).y.abs() > 1.0 {
+                            let offset = self.window_to_canvas(position, bounds);
+                            message = Some(GraphMessage::DraggingNode(id, offset));
+                            status = Status::Captured;
+                        }
                     }
                     GraphInteraction::Panning { translation, start } => {
                         message = Some(GraphMessage::Translated(
@@ -258,8 +260,11 @@ impl canvas::Program<GraphMessage> for Graph {
                     }
                 },
                 mouse::Event::ButtonReleased(button) => match button {
-                    mouse::Button::Left => {
-                        if matches!(interaction, GraphInteraction::DraggingNode(..)) {
+                    mouse::Button::Left | mouse::Button::Right => {
+                        if matches!(
+                            interaction,
+                            GraphInteraction::DraggingNode(..) | GraphInteraction::Panning { .. }
+                        ) {
                             *interaction = GraphInteraction::None;
                             status = Status::Ignored;
                         }
@@ -277,7 +282,7 @@ impl canvas::Program<GraphMessage> for Graph {
                     mouse::Button::Left => {
                         if let GraphInteraction::HoverNode(id) = *interaction {
                             if let Some(selected_node) = self.selected_node {
-                                *interaction = GraphInteraction::DraggingNode(selected_node);
+                                *interaction = GraphInteraction::DraggingNode(selected_node, cursor_position);
                                 status = Status::Captured;
                             } else {
                                 message = Some(GraphMessage::ClickNode((id, mouse_event)));
@@ -301,13 +306,8 @@ impl canvas::Program<GraphMessage> for Graph {
         renderer: &Renderer,
         _theme: &Theme,
         bounds: Rectangle,
-        cursor: mouse::Cursor,
+        _cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
-        println!("interaction: {:?}", interaction);
-        let hovered_node = cursor.position_in(bounds).map_or(None, |cursor_position| {
-            let canvas_position = self.window_to_canvas(cursor_position, bounds);
-            self.nodes.iter().find(|node| node.is_in_bounds(canvas_position))
-        });
         let center = Vector::new(bounds.width / 2.0, bounds.height / 2.0);
         let mut frame = Frame::new(renderer, bounds.size());
         frame.with_save(|mut frame| {
