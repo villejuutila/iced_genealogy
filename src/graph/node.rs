@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub trait GraphNodeTrait {
     fn id(&self) -> u128;
     fn anchor(&self) -> Point;
+    fn set_anchor(&mut self, anchor: Point);
     fn size(&self) -> Size;
     fn draw<'a>(&self, frame: &'a mut Frame, hovered: bool) -> Vec<&'a Frame>;
     fn is_in_bounds(&self, point: Point) -> bool {
@@ -39,6 +40,11 @@ impl GraphNodeType {
     pub fn anchor(&self) -> Point {
         match self {
             GraphNodeType::GenealogicalNode(node) => node.anchor(),
+        }
+    }
+    pub fn set_anchor(&mut self, anchor: Point) {
+        match self {
+            GraphNodeType::GenealogicalNode(node) => node.set_anchor(anchor),
         }
     }
     pub fn size(&self) -> Size {
@@ -113,6 +119,10 @@ impl GraphNodeTrait for GenealogicalNode {
 
     fn anchor(&self) -> Point {
         self.anchor
+    }
+
+    fn set_anchor(&mut self, anchor: Point) {
+        self.anchor = anchor;
     }
 
     fn size(&self) -> Size {

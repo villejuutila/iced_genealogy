@@ -18,6 +18,7 @@ pub enum GraphInteraction {
     None,
     Panning { translation: Vector, start: Point },
     HoverNode(u128),
+    DraggingNode(u128),
 }
 
 impl Default for GraphInteraction {
@@ -31,6 +32,7 @@ pub enum GraphMessage {
     ClickNode((u128, mouse::Event)),
     Scaled(f32, Option<Vector>),
     Translated(Vector),
+    DraggingNode(u128, Point),
 }
 
 #[derive(Debug, Clone)]
@@ -44,8 +46,6 @@ pub struct Region {
     x: f32,
     y: f32,
 }
-
-// impl Edge {}
 
 pub struct Graph {
     nodes: Vec<GraphNodeType>,
@@ -172,6 +172,10 @@ impl Graph {
                 self.add_edge_between_nodes(edge_node_id, new_node.id());
                 self.insert_node(new_node);
             }
+            GraphMessage::DraggingNode(id, offset) => {
+                let node = self.get_node_mut_unsafe(Some(id));
+                node.set_anchor(offset);
+            }
         }
     }
 
@@ -197,9 +201,15 @@ impl canvas::Program<GraphMessage> for Graph {
         let mut status = Status::Ignored;
         let mut message = None;
         let cursor_position = cursor.position_in(bounds).unwrap_or(Point::ORIGIN);
+        let canvas_position = self.window_to_canvas(cursor_position, bounds);
         match event {
             canvas::Event::Mouse(mouse_event) => match mouse_event {
-                mouse::Event::CursorMoved { .. } => match *interaction {
+                mouse::Event::CursorMoved { position } => match *interaction {
+                    GraphInteraction::DraggingNode(id) => {
+                        let offset = self.window_to_canvas(position, bounds);
+                        message = Some(GraphMessage::DraggingNode(id, Point::new(offset.x, offset.y)));
+                        status = Status::Captured;
+                    }
                     GraphInteraction::Panning { translation, start } => {
                         message = Some(GraphMessage::Translated(
                             translation + (cursor_position - start) * (1.0 / self.scaling),
@@ -207,10 +217,7 @@ impl canvas::Program<GraphMessage> for Graph {
                         status = Status::Captured;
                     }
                     _ => {
-                        if let Some(hovered_node) = cursor.position_in(bounds).map_or(None, |cursor_position| {
-                            let canvas_position = self.window_to_canvas(cursor_position, bounds);
-                            self.nodes.iter().find(|node| node.is_in_bounds(canvas_position))
-                        }) {
+                        if let Some(hovered_node) = self.nodes.iter().find(|node| node.is_in_bounds(canvas_position)) {
                             *interaction = GraphInteraction::HoverNode(hovered_node.id());
                             status = Status::Captured;
                         } else {
@@ -243,9 +250,11 @@ impl canvas::Program<GraphMessage> for Graph {
                     }
                 },
                 mouse::Event::ButtonReleased(button) => match button {
-                    mouse::Button::Right => {
-                        *interaction = GraphInteraction::None;
-                        status = Status::Ignored;
+                    mouse::Button::Left => {
+                        if matches!(interaction, GraphInteraction::DraggingNode(..)) {
+                            *interaction = GraphInteraction::None;
+                            status = Status::Ignored;
+                        }
                     }
                     _ => {}
                 },
@@ -260,6 +269,10 @@ impl canvas::Program<GraphMessage> for Graph {
                     mouse::Button::Left => {
                         if let GraphInteraction::HoverNode(id) = *interaction {
                             message = Some(GraphMessage::ClickNode((id, mouse_event)));
+                            status = Status::Captured;
+                        }
+                        if let Some(selected_node) = self.selected_node {
+                            *interaction = GraphInteraction::DraggingNode(selected_node);
                             status = Status::Captured;
                         }
                     }
