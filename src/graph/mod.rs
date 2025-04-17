@@ -2,7 +2,6 @@ pub mod node;
 
 use iced::{
     event::Status,
-    keyboard,
     mouse::{self},
     widget::{
         canvas::{self, Frame, Path, Stroke},
@@ -14,10 +13,11 @@ use iced::{
 };
 use node::GraphNodeType;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GraphInteraction {
     None,
     Panning { translation: Vector, start: Point },
+    HoverNode(u128),
 }
 
 impl Default for GraphInteraction {
@@ -29,7 +29,6 @@ impl Default for GraphInteraction {
 pub enum GraphMessage {
     InsertNode(Option<u128>),
     ClickNode((u128, mouse::Event)),
-    UpdateBounds(Rectangle),
     Scaled(f32, Option<Vector>),
     Translated(Vector),
 }
@@ -44,8 +43,6 @@ pub struct Edge {
 pub struct Region {
     x: f32,
     y: f32,
-    width: f32,
-    height: f32,
 }
 
 // impl Edge {}
@@ -57,6 +54,7 @@ pub struct Graph {
     edges: Vec<Edge>,
     scaling: f32,
     translation: Vector,
+    selected_node: Option<u128>,
 }
 
 impl Default for Graph {
@@ -68,11 +66,15 @@ impl Default for Graph {
             edges: vec![],
             scaling: 1.0,
             translation: Vector::default(),
+            selected_node: None,
         }
     }
 }
 
 impl Graph {
+    const MIN_SCALING: f32 = 0.1;
+    const MAX_SCALING: f32 = 2.0;
+
     fn visible_region(&self, size: Size) -> Region {
         let width = size.width / self.scaling;
         let height = size.height / self.scaling;
@@ -80,8 +82,6 @@ impl Graph {
         Region {
             x: self.translation.x - width / 2.0,
             y: self.translation.y - height / 2.0,
-            width,
-            height,
         }
     }
 
@@ -123,28 +123,17 @@ impl Graph {
     pub fn bounds(&self) -> Rectangle {
         self.bounds
     }
-    pub fn set_bounds(&mut self, bounds: Rectangle) {
-        self.bounds = bounds;
-    }
-    pub fn nodes(&self) -> &Vec<GraphNodeType> {
-        &self.nodes
-    }
     pub fn set_selected_node(&mut self, node_id: u128) {
-        for node in self.nodes.iter_mut() {
-            if node.id() == node_id {
-                node.set_selected(true);
-            } else {
-                node.set_selected(false);
-            }
-        }
+        self.selected_node = Some(node_id);
     }
 
-    pub fn deselect_node(&mut self, node_id: u128) {
-        for node in self.nodes.iter_mut() {
-            if node.id() == node_id {
-                node.set_selected(false);
-            }
-        }
+    #[allow(dead_code)]
+    pub fn deselect_node(&mut self) {
+        self.selected_node = None;
+    }
+
+    pub fn selected_node(&self) -> Option<&GraphNodeType> {
+        self.nodes.iter().find(|node| self.selected_node == Some(node.id()))
     }
 
     pub fn tick(&mut self) {
@@ -170,6 +159,9 @@ impl Graph {
             GraphMessage::Translated(translation) => {
                 self.translation = translation;
             }
+            GraphMessage::ClickNode((node_id, _)) => {
+                self.set_selected_node(node_id);
+            }
             GraphMessage::InsertNode(edge_node_id) => {
                 let mut center = self.project(self.bounds().center(), self.bounds().size());
                 if let Some(found_node) = self.get_node(edge_node_id) {
@@ -180,7 +172,6 @@ impl Graph {
                 self.add_edge_between_nodes(edge_node_id, new_node.id());
                 self.insert_node(new_node);
             }
-            _ => {}
         }
     }
 
@@ -190,114 +181,6 @@ impl Graph {
         let translated = window_pos - center;
         let scaled = Point::new(translated.x * (1.0 / self.scaling), translated.y * (1.0 / self.scaling));
         scaled - self.translation
-    }
-
-    pub fn on_event<'c>(
-        &self,
-        event: canvas::Event,
-        interaction: &'c mut GraphInteraction,
-        message: Option<GraphMessage>,
-        cursor: mouse::Cursor,
-        bounds: Rectangle,
-    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphInteraction) {
-        let status = Status::Ignored;
-
-        match event {
-            canvas::Event::Mouse(mouse_event) => {
-                self.on_mouse_event(mouse_event, message, status, interaction, cursor, bounds)
-            }
-            canvas::Event::Keyboard(keyboard_event) => {
-                self.on_keyboard_event(keyboard_event, message, status, interaction)
-            }
-            _ => {
-                println!("Unhandled event: {:?}", event);
-                (status, message, interaction)
-            }
-        }
-    }
-
-    fn on_keyboard_event<'c>(
-        &self,
-        event: keyboard::Event,
-        message: Option<GraphMessage>,
-        status: Status,
-        state: &'c mut GraphInteraction,
-    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphInteraction) {
-        match event {
-            _ => {}
-        }
-
-        (status, message, state)
-    }
-
-    const MIN_SCALING: f32 = 0.1;
-    const MAX_SCALING: f32 = 2.0;
-
-    fn on_mouse_event<'c>(
-        &self,
-        event: mouse::Event,
-        mut message: Option<GraphMessage>,
-        mut status: Status,
-        interaction: &'c mut GraphInteraction,
-        cursor: mouse::Cursor,
-        bounds: Rectangle,
-    ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphInteraction) {
-        let cursor_position = cursor.position_in(bounds).unwrap_or(Point::ORIGIN);
-        match event {
-            mouse::Event::CursorMoved { .. } => match *interaction {
-                GraphInteraction::Panning { translation, start } => {
-                    message = Some(GraphMessage::Translated(
-                        translation + (cursor_position - start) * (1.0 / self.scaling),
-                    ));
-                    status = Status::Captured;
-                }
-                _ => {}
-            },
-            mouse::Event::WheelScrolled { delta } => match delta {
-                mouse::ScrollDelta::Lines { y, .. } | mouse::ScrollDelta::Pixels { y, .. } => {
-                    if y < 0.0 && self.scaling > Self::MIN_SCALING || y > 0.0 && self.scaling < Self::MAX_SCALING {
-                        let old_scaling = self.scaling;
-                        let scaling = (self.scaling * (1.0 + y / 30.0)).clamp(Self::MIN_SCALING, Self::MAX_SCALING);
-                        let translation = if let Some(cursor_to_center) = cursor.position_from(bounds.center()) {
-                            let factor = scaling - old_scaling;
-
-                            Some(
-                                self.translation
-                                    - Vector::new(
-                                        cursor_to_center.x * factor / (old_scaling * old_scaling),
-                                        cursor_to_center.y * factor / (old_scaling * old_scaling),
-                                    ),
-                            )
-                        } else {
-                            None
-                        };
-
-                        message = Some(GraphMessage::Scaled(scaling, translation))
-                    }
-                }
-            },
-            mouse::Event::ButtonReleased(button) => match button {
-                mouse::Button::Right => {
-                    *interaction = GraphInteraction::None;
-                    status = Status::Ignored;
-                }
-                _ => {}
-            },
-            mouse::Event::ButtonPressed(button) => match button {
-                mouse::Button::Right => {
-                    *interaction = GraphInteraction::Panning {
-                        translation: self.translation,
-                        start: cursor_position,
-                    };
-                    status = Status::Captured;
-                }
-                mouse::Button::Left => {}
-                _ => {}
-            },
-            _ => {}
-        }
-
-        (status, message, interaction)
     }
 }
 
@@ -311,19 +194,88 @@ impl canvas::Program<GraphMessage> for Graph {
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<GraphMessage>) {
+        let mut status = Status::Ignored;
         let mut message = None;
+        let cursor_position = cursor.position_in(bounds).unwrap_or(Point::ORIGIN);
+        match event {
+            canvas::Event::Mouse(mouse_event) => match mouse_event {
+                mouse::Event::CursorMoved { .. } => match *interaction {
+                    GraphInteraction::Panning { translation, start } => {
+                        message = Some(GraphMessage::Translated(
+                            translation + (cursor_position - start) * (1.0 / self.scaling),
+                        ));
+                        status = Status::Captured;
+                    }
+                    _ => {
+                        if let Some(hovered_node) = cursor.position_in(bounds).map_or(None, |cursor_position| {
+                            let canvas_position = self.window_to_canvas(cursor_position, bounds);
+                            self.nodes.iter().find(|node| node.is_in_bounds(canvas_position))
+                        }) {
+                            *interaction = GraphInteraction::HoverNode(hovered_node.id());
+                            status = Status::Captured;
+                        } else {
+                            *interaction = GraphInteraction::None;
+                            status = Status::Ignored;
+                        }
+                    }
+                },
+                mouse::Event::WheelScrolled { delta } => match delta {
+                    mouse::ScrollDelta::Lines { y, .. } | mouse::ScrollDelta::Pixels { y, .. } => {
+                        if y < 0.0 && self.scaling > Self::MIN_SCALING || y > 0.0 && self.scaling < Self::MAX_SCALING {
+                            let old_scaling = self.scaling;
+                            let scaling = (self.scaling * (1.0 + y / 30.0)).clamp(Self::MIN_SCALING, Self::MAX_SCALING);
+                            let translation = if let Some(cursor_to_center) = cursor.position_from(bounds.center()) {
+                                let factor = scaling - old_scaling;
 
-        if bounds != self.bounds {
-            message = Some(GraphMessage::UpdateBounds(bounds));
+                                Some(
+                                    self.translation
+                                        - Vector::new(
+                                            cursor_to_center.x * factor / (old_scaling * old_scaling),
+                                            cursor_to_center.y * factor / (old_scaling * old_scaling),
+                                        ),
+                                )
+                            } else {
+                                None
+                            };
+
+                            message = Some(GraphMessage::Scaled(scaling, translation))
+                        }
+                    }
+                },
+                mouse::Event::ButtonReleased(button) => match button {
+                    mouse::Button::Right => {
+                        *interaction = GraphInteraction::None;
+                        status = Status::Ignored;
+                    }
+                    _ => {}
+                },
+                mouse::Event::ButtonPressed(button) => match button {
+                    mouse::Button::Right => {
+                        *interaction = GraphInteraction::Panning {
+                            translation: self.translation,
+                            start: cursor_position,
+                        };
+                        status = Status::Captured;
+                    }
+                    mouse::Button::Left => {
+                        if let GraphInteraction::HoverNode(id) = *interaction {
+                            message = Some(GraphMessage::ClickNode((id, mouse_event)));
+                            status = Status::Captured;
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
+            _ => {}
         }
 
-        let (status, message, _) = self.on_event(event, interaction, message, cursor, bounds);
         (status, message)
     }
 
     fn draw(
         &self,
-        _interaction: &GraphInteraction,
+        interaction: &GraphInteraction,
         renderer: &Renderer,
         _theme: &Theme,
         bounds: Rectangle,
@@ -341,7 +293,12 @@ impl canvas::Program<GraphMessage> for Graph {
             frame.scale(self.scaling);
             frame.translate(self.translation);
             for node in self.nodes.iter() {
-                node.draw(&mut frame);
+                let hovered = if let GraphInteraction::HoverNode(id) = *interaction {
+                    id == node.id()
+                } else {
+                    false
+                };
+                node.draw(&mut frame, hovered);
             }
             for edge in self.edges() {
                 let start = self.get_node_unsafe(Some(edge.start));

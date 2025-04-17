@@ -8,9 +8,7 @@ pub trait GraphNodeTrait {
     fn id(&self) -> u128;
     fn anchor(&self) -> Point;
     fn size(&self) -> Size;
-    fn selected(&self) -> bool;
-    fn set_selected(&mut self, selected: bool);
-    fn draw<'a>(&self, frame: &'a mut Frame) -> Vec<&'a Frame>;
+    fn draw<'a>(&self, frame: &'a mut Frame, hovered: bool) -> Vec<&'a Frame>;
     fn is_in_bounds(&self, point: Point) -> bool {
         let anchor = self.anchor();
         let size = self.size();
@@ -38,11 +36,6 @@ impl GraphNodeType {
             GraphNodeType::GenealogicalNode(node) => node.id(),
         }
     }
-    pub fn set_selected(&mut self, selected: bool) {
-        match self {
-            GraphNodeType::GenealogicalNode(node) => node.set_selected(selected),
-        }
-    }
     pub fn anchor(&self) -> Point {
         match self {
             GraphNodeType::GenealogicalNode(node) => node.anchor(),
@@ -58,9 +51,9 @@ impl GraphNodeType {
             GraphNodeType::GenealogicalNode(node) => node.is_in_bounds(point),
         }
     }
-    pub fn draw<'a>(&self, frame: &'a mut Frame) -> Vec<&'a Frame> {
+    pub fn draw<'a>(&self, frame: &'a mut Frame, hovered: bool) -> Vec<&'a Frame> {
         match self {
-            GraphNodeType::GenealogicalNode(node) => node.draw(frame),
+            GraphNodeType::GenealogicalNode(node) => node.draw(frame, hovered),
         }
     }
 }
@@ -76,7 +69,6 @@ pub struct GenealogicalNode {
     id: u128,
     anchor: Point,
     size: Size,
-    selected: bool,
     sex: Option<Sex>,
     first_name: Option<String>,
     last_name: Option<String>,
@@ -88,7 +80,6 @@ impl GenealogicalNode {
             anchor,
             id: Uuid::new_v4().as_u128(),
             size: Size::new(100.0, 100.0),
-            selected: false,
             sex: None,
             first_name: None,
             last_name: None,
@@ -128,16 +119,8 @@ impl GraphNodeTrait for GenealogicalNode {
         self.size
     }
 
-    fn selected(&self) -> bool {
-        self.selected
-    }
-
-    fn set_selected(&mut self, selected: bool) {
-        self.selected = selected;
-    }
-
-    fn draw<'a>(&self, frame: &'a mut Frame) -> Vec<&'a Frame> {
-        let color = if self.selected() {
+    fn draw<'a>(&self, frame: &'a mut Frame, hovered: bool) -> Vec<&'a Frame> {
+        let color = if hovered {
             Color { a: 0.5, ..Color::WHITE }
         } else {
             Color::WHITE

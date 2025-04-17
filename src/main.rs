@@ -24,7 +24,6 @@ enum Message {
 
 struct App {
     graph: Graph,
-    selected_node: Option<u128>,
 }
 
 impl App {
@@ -41,39 +40,11 @@ impl App {
                 node.set_sex(sex);
             }
             Message::Graph(graph_message) => self.graph.update(graph_message),
-            // GraphMessage::InsertNode(edge_node_id) => {
-            //     println!("Insert node edge_node_id: {:?}", edge_node_id);
-            //     let mut center = self.graph.bounds().center();
-            //     if let Some(found_node) = self.graph.get_node(edge_node_id) {
-            //         center = found_node.anchor();
-            //         center.y += found_node.size().height * 2.0;
-            //     }
-            //     let new_node = GenealogicalNode::new(center);
-            //     self.graph.add_edge_between_nodes(edge_node_id, new_node.id());
-            //     self.graph
-            //         .insert_node(graph::node::GraphNodeType::GenealogicalNode(new_node));
-            // }
-            // GraphMessage::ClickNode((node_id, event)) => match event {
-            //     mouse::Event::ButtonPressed(mouse::Button::Left) => {
-            //         if self.selected_node.is_some() {
-            //             self.selected_node = None;
-            //             self.graph.deselect_node(node_id);
-            //         } else {
-            //             self.selected_node = Some(node_id);
-            //             self.graph.set_selected_node(node_id);
-            //         }
-            //     }
-            //     _ => {}
-            // },
         }
     }
 
     fn view(&self) -> Element<Message> {
-        let selected_node = self
-            .graph
-            .nodes()
-            .iter()
-            .find(|node| node.id() == self.selected_node.unwrap_or(0));
+        let selected_node = self.graph.selected_node();
         let content = row![self.graph.view().map(Message::Graph), side_panel(selected_node)];
 
         container(content).width(Fill).height(Fill).into()
@@ -93,7 +64,6 @@ impl Default for App {
     fn default() -> Self {
         Self {
             graph: Graph::default(),
-            selected_node: None,
         }
     }
 }
