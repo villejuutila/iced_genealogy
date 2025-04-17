@@ -4,15 +4,13 @@ use iced::{
 };
 use uuid::Uuid;
 
-use super::{Graph, GraphState};
-
 pub trait GraphNodeTrait {
     fn id(&self) -> u128;
     fn anchor(&self) -> Point;
     fn size(&self) -> Size;
     fn selected(&self) -> bool;
     fn set_selected(&mut self, selected: bool);
-    fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph) -> Vec<&'a Frame>;
+    fn draw<'a>(&self, frame: &'a mut Frame) -> Vec<&'a Frame>;
     fn is_in_bounds(&self, point: Point) -> bool {
         let anchor = self.anchor();
         let size = self.size();
@@ -60,9 +58,9 @@ impl GraphNodeType {
             GraphNodeType::GenealogicalNode(node) => node.is_in_bounds(point),
         }
     }
-    pub fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph) -> Vec<&'a Frame> {
+    pub fn draw<'a>(&self, frame: &'a mut Frame) -> Vec<&'a Frame> {
         match self {
-            GraphNodeType::GenealogicalNode(node) => node.draw(frame, graph),
+            GraphNodeType::GenealogicalNode(node) => node.draw(frame),
         }
     }
 }
@@ -138,8 +136,7 @@ impl GraphNodeTrait for GenealogicalNode {
         self.selected = selected;
     }
 
-    fn draw<'a>(&self, frame: &'a mut Frame, graph: &Graph) -> Vec<&'a Frame> {
-        // let hovered = interaction == &GraphInteraction::HoverGraphNode(self.id);
+    fn draw<'a>(&self, frame: &'a mut Frame) -> Vec<&'a Frame> {
         let color = if self.selected() {
             Color { a: 0.5, ..Color::WHITE }
         } else {

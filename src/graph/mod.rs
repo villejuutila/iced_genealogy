@@ -1,10 +1,9 @@
 pub mod node;
 
 use iced::{
-    advanced::graphics::geometry::frame::Backend,
     event::Status,
     keyboard,
-    mouse::{self, ScrollDelta},
+    mouse::{self},
     widget::{
         canvas::{self, Frame, Path, Stroke},
         Canvas,
@@ -14,16 +13,6 @@ use iced::{
     Point, Rectangle, Renderer, Size, Theme, Vector,
 };
 use node::GraphNodeType;
-
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub struct GraphState {
-    cursor_position: Point,
-    prev_cursor_position: Point,
-    scale: f32,
-    offset_x: f32,
-    offset_y: f32,
-    panning: bool,
-}
 
 #[derive(Debug, Clone)]
 pub enum GraphInteraction {
@@ -36,20 +25,6 @@ impl Default for GraphInteraction {
         Self::None
     }
 }
-
-impl Default for GraphState {
-    fn default() -> Self {
-        Self {
-            cursor_position: Point::ORIGIN,
-            prev_cursor_position: Point::ORIGIN,
-            scale: 1.0,
-            offset_x: 0.0,
-            offset_y: 0.0,
-            panning: false,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum GraphMessage {
     InsertNode(Option<u128>),
@@ -195,14 +170,32 @@ impl Graph {
             GraphMessage::Translated(translation) => {
                 self.translation = translation;
             }
+            GraphMessage::InsertNode(edge_node_id) => {
+                let mut center = self.project(self.bounds().center(), self.bounds().size());
+                if let Some(found_node) = self.get_node(edge_node_id) {
+                    center = found_node.anchor();
+                    center.y += found_node.size().height * 2.0;
+                }
+                let new_node = GraphNodeType::GenealogicalNode(node::GenealogicalNode::new(center));
+                self.add_edge_between_nodes(edge_node_id, new_node.id());
+                self.insert_node(new_node);
+            }
             _ => {}
         }
+    }
+
+    pub fn window_to_canvas(&self, window_pos: Point, bounds: Rectangle) -> Point {
+        let center = Vector::new(bounds.width / 2.0, bounds.height / 2.0);
+
+        let translated = window_pos - center;
+        let scaled = Point::new(translated.x * (1.0 / self.scaling), translated.y * (1.0 / self.scaling));
+        scaled - self.translation
     }
 
     pub fn on_event<'c>(
         &self,
         event: canvas::Event,
-        state: &'c mut GraphInteraction,
+        interaction: &'c mut GraphInteraction,
         message: Option<GraphMessage>,
         cursor: mouse::Cursor,
         bounds: Rectangle,
@@ -211,12 +204,14 @@ impl Graph {
 
         match event {
             canvas::Event::Mouse(mouse_event) => {
-                self.on_mouse_event(mouse_event, message, status, state, cursor, bounds)
+                self.on_mouse_event(mouse_event, message, status, interaction, cursor, bounds)
             }
-            canvas::Event::Keyboard(keyboard_event) => self.on_keyboard_event(keyboard_event, message, status, state),
+            canvas::Event::Keyboard(keyboard_event) => {
+                self.on_keyboard_event(keyboard_event, message, status, interaction)
+            }
             _ => {
                 println!("Unhandled event: {:?}", event);
-                (status, message, state)
+                (status, message, interaction)
             }
         }
     }
@@ -243,13 +238,13 @@ impl Graph {
         event: mouse::Event,
         mut message: Option<GraphMessage>,
         mut status: Status,
-        state: &'c mut GraphInteraction,
+        interaction: &'c mut GraphInteraction,
         cursor: mouse::Cursor,
         bounds: Rectangle,
     ) -> (canvas::event::Status, Option<GraphMessage>, &'c mut GraphInteraction) {
         let cursor_position = cursor.position_in(bounds).unwrap_or(Point::ORIGIN);
         match event {
-            mouse::Event::CursorMoved { .. } => match *state {
+            mouse::Event::CursorMoved { .. } => match *interaction {
                 GraphInteraction::Panning { translation, start } => {
                     message = Some(GraphMessage::Translated(
                         translation + (cursor_position - start) * (1.0 / self.scaling),
@@ -283,14 +278,14 @@ impl Graph {
             },
             mouse::Event::ButtonReleased(button) => match button {
                 mouse::Button::Right => {
-                    *state = GraphInteraction::None;
+                    *interaction = GraphInteraction::None;
                     status = Status::Ignored;
                 }
                 _ => {}
             },
             mouse::Event::ButtonPressed(button) => match button {
                 mouse::Button::Right => {
-                    *state = GraphInteraction::Panning {
+                    *interaction = GraphInteraction::Panning {
                         translation: self.translation,
                         start: cursor_position,
                     };
@@ -302,49 +297,7 @@ impl Graph {
             _ => {}
         }
 
-        (status, message, state)
-    }
-
-    fn to_canvas_point(&self, state: &GraphState, point: Point) -> Point {
-        Point::new(self.to_canvas_x(state, point.x), self.to_canvas_y(state, point.y))
-    }
-
-    #[allow(dead_code)]
-    fn to_window_point(&self, state: &GraphState, point: Point) -> Point {
-        Point::new(self.to_window_x(state, point.x), self.to_window_y(state, point.y))
-    }
-
-    fn to_canvas_x(&self, state: &GraphState, window_x: f32) -> f32 {
-        (window_x + state.offset_x) * state.scale
-    }
-
-    fn to_canvas_y(&self, state: &GraphState, window_y: f32) -> f32 {
-        (window_y + state.offset_y) * state.scale
-    }
-
-    fn to_window_x(&self, state: &GraphState, canvas_x: f32) -> f32 {
-        (canvas_x / state.scale) - state.offset_x
-    }
-
-    fn to_window_y(&self, state: &GraphState, canvas_y: f32) -> f32 {
-        (canvas_y / state.scale) - state.offset_y
-    }
-
-    #[allow(dead_code)]
-    fn true_height(&self, state: &GraphState) -> f32 {
-        self.bounds.height / state.scale
-    }
-
-    #[allow(dead_code)]
-    fn true_width(&self, state: &GraphState) -> f32 {
-        self.bounds.width / state.scale
-    }
-
-    fn on_draw(&self, state: &mut GraphState) {
-        if !state.panning {
-            return;
-        }
-        state.prev_cursor_position = state.cursor_position;
+        (status, message, interaction)
     }
 }
 
@@ -353,7 +306,7 @@ impl canvas::Program<GraphMessage> for Graph {
 
     fn update(
         &self,
-        state: &mut Self::State,
+        interaction: &mut Self::State,
         event: canvas::Event,
         bounds: Rectangle,
         cursor: mouse::Cursor,
@@ -364,25 +317,21 @@ impl canvas::Program<GraphMessage> for Graph {
             message = Some(GraphMessage::UpdateBounds(bounds));
         }
 
-        let (status, message, _) = self.on_event(event, state, message, cursor, bounds);
+        let (status, message, _) = self.on_event(event, interaction, message, cursor, bounds);
         (status, message)
     }
 
     fn draw(
         &self,
-        state: &GraphInteraction,
+        _interaction: &GraphInteraction,
         renderer: &Renderer,
         _theme: &Theme,
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
-        println!("visible region: {:#?}", self.visible_region(bounds.size()));
         let hovered_node = cursor.position_in(bounds).map_or(None, |cursor_position| {
-            let cursor_position = self.project(cursor_position, bounds.size());
-            let c = cursor.position().unwrap_or(Point::ORIGIN);
-            println!("cursor position: {:#?}", cursor_position);
-            println!("cursor.position(): {:#?}", c);
-            self.nodes.iter().find(|node| node.is_in_bounds(c))
+            let canvas_position = self.window_to_canvas(cursor_position, bounds);
+            self.nodes.iter().find(|node| node.is_in_bounds(canvas_position))
         });
         println!("Hovered node: {:#?}", hovered_node);
         let center = Vector::new(bounds.width / 2.0, bounds.height / 2.0);
@@ -392,29 +341,21 @@ impl canvas::Program<GraphMessage> for Graph {
             frame.scale(self.scaling);
             frame.translate(self.translation);
             for node in self.nodes.iter() {
-                node.draw(&mut frame, &self);
+                node.draw(&mut frame);
             }
-            //     for edge in self.edges() {
-            //         let start = self.get_node_unsafe(Some(edge.start));
-            //         let end = self.get_node_unsafe(Some(edge.end));
-            //         // let start_above = start.anchor().y <= end.anchor().y;
-            //         let start_point = self.to_canvas_point(
-            //             state,
-            //             Point::new(
-            //                 start.anchor().x + start.size().width / 2.0,
-            //                 start.anchor().y + start.size().height,
-            //             ),
-            //         );
-            //         let end_point = self.to_canvas_point(
-            //             state,
-            //             Point::new(end.anchor().x + end.size().width / 2.0, end.anchor().y),
-            //         );
-            //         let path = Path::line(start_point, end_point);
-            //         frame.stroke(&path, Stroke::default().with_width(2.0).with_color(Color::WHITE));
-            //     }
+            for edge in self.edges() {
+                let start = self.get_node_unsafe(Some(edge.start));
+                let end = self.get_node_unsafe(Some(edge.end));
+                // let start_above = start.anchor().y <= end.anchor().y;
+                let start_point = Point::new(
+                    start.anchor().x + start.size().width / 2.0,
+                    start.anchor().y + start.size().height,
+                );
+                let end_point = Point::new(end.anchor().x + end.size().width / 2.0, end.anchor().y);
+                let path = Path::line(start_point, end_point);
+                frame.stroke(&path, Stroke::default().with_width(2.0).with_color(Color::WHITE));
+            }
         });
-        // let mut st = *state;
-        // self.on_draw(&mut st);
         vec![frame.into_geometry()]
     }
 }
