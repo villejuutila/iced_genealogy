@@ -1,68 +1,10 @@
 use iced::{
-    widget::canvas::{self, Frame, Stroke},
+    widget::canvas::{Frame, Stroke, Text},
     Color, Point, Size,
 };
 use uuid::Uuid;
 
-pub trait GraphNodeTrait {
-    fn id(&self) -> u128;
-    fn anchor(&self) -> Point;
-    fn set_anchor(&mut self, anchor: Point);
-    fn size(&self) -> Size;
-    fn draw<'a>(&self, frame: &'a mut Frame, hovered: bool) -> Vec<&'a Frame>;
-    fn is_in_bounds(&self, point: Point) -> bool {
-        let anchor = self.anchor();
-        let size = self.size();
-        point.x >= anchor.x
-            && point.x <= anchor.x + size.width
-            && point.y >= anchor.y
-            && point.y <= anchor.y + size.height
-    }
-}
-
-impl std::fmt::Debug for dyn GraphNodeTrait {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "GraphNodeTrait {}", self.id())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum GraphNodeType {
-    GenealogicalNode(GenealogicalNode),
-}
-
-impl GraphNodeType {
-    pub fn id(&self) -> u128 {
-        match self {
-            GraphNodeType::GenealogicalNode(node) => node.id(),
-        }
-    }
-    pub fn anchor(&self) -> Point {
-        match self {
-            GraphNodeType::GenealogicalNode(node) => node.anchor(),
-        }
-    }
-    pub fn set_anchor(&mut self, anchor: Point) {
-        match self {
-            GraphNodeType::GenealogicalNode(node) => node.set_anchor(anchor),
-        }
-    }
-    pub fn size(&self) -> Size {
-        match self {
-            GraphNodeType::GenealogicalNode(node) => node.size(),
-        }
-    }
-    pub fn is_in_bounds(&self, point: Point) -> bool {
-        match self {
-            GraphNodeType::GenealogicalNode(node) => node.is_in_bounds(point),
-        }
-    }
-    pub fn draw<'a>(&self, frame: &'a mut Frame, hovered: bool) -> Vec<&'a Frame> {
-        match self {
-            GraphNodeType::GenealogicalNode(node) => node.draw(frame, hovered),
-        }
-    }
-}
+use super::GraphNodeTrait;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sex {
@@ -81,17 +23,6 @@ pub struct GenealogicalNode {
 }
 
 impl GenealogicalNode {
-    pub fn new(anchor: Point) -> Self {
-        Self {
-            anchor,
-            id: Uuid::new_v4().as_u128(),
-            size: Size::new(100.0, 100.0),
-            sex: None,
-            first_name: None,
-            last_name: None,
-        }
-    }
-
     fn text_position(&self) -> Point {
         Point::new(
             self.anchor.x + self.size.width / 2.0,
@@ -113,6 +44,16 @@ impl GenealogicalNode {
 }
 
 impl GraphNodeTrait for GenealogicalNode {
+    fn new(anchor: Point) -> Self {
+        Self {
+            anchor,
+            id: Uuid::new_v4().as_u128(),
+            size: Size::new(100.0, 100.0),
+            sex: None,
+            first_name: None,
+            last_name: None,
+        }
+    }
     fn id(&self) -> u128 {
         self.id
     }
@@ -155,7 +96,7 @@ impl GraphNodeTrait for GenealogicalNode {
         if self.last_name.is_some() {
             name.push_str(&self.last_name.as_ref().unwrap());
         }
-        frame.fill_text(canvas::Text {
+        frame.fill_text(Text {
             content: name,
             size: 20.0.into(),
             color: Color {

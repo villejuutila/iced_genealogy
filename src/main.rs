@@ -3,7 +3,10 @@ mod side_panel;
 
 use std::time::Duration;
 
-use graph::{node::Sex, Graph, GraphMessage};
+use graph::{
+    node::genealogical_node::{GenealogicalNode, Sex},
+    Graph, GraphMessage,
+};
 use iced::{
     event, time,
     widget::{container, row},
@@ -23,7 +26,7 @@ enum Message {
 }
 
 struct App {
-    graph: Graph,
+    graph: Graph<GenealogicalNode>,
 }
 
 impl App {
@@ -32,11 +35,11 @@ impl App {
             Message::EventOccurred(event) => self.on_event(event),
             Message::Tick => self.graph.tick(),
             Message::UpdateNodeName((node_id, name)) => {
-                let graph::node::GraphNodeType::GenealogicalNode(node) = self.graph.get_node_mut_unsafe(Some(node_id));
+                let node = self.graph.get_node_mut_unsafe(Some(node_id));
                 node.set_first_name(name);
             }
             Message::SetNodeSex((node_id, sex)) => {
-                let graph::node::GraphNodeType::GenealogicalNode(node) = self.graph.get_node_mut_unsafe(Some(node_id));
+                let node = self.graph.get_node_mut_unsafe(Some(node_id));
                 node.set_sex(sex);
             }
             Message::Graph(graph_message) => self.graph.update(graph_message),

@@ -11,7 +11,8 @@ use iced::{
     Length::Fill,
     Point, Rectangle, Renderer, Size, Theme, Vector,
 };
-use node::GraphNodeType;
+use node::GraphNodeTrait;
+// use node_old::GraphNodeType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GraphInteraction {
@@ -47,8 +48,8 @@ pub struct Region {
     y: f32,
 }
 
-pub struct Graph {
-    nodes: Vec<GraphNodeType>,
+pub struct Graph<T: GraphNodeTrait> {
+    nodes: Vec<T>,
     tick: u128,
     bounds: Rectangle,
     edges: Vec<Edge>,
@@ -57,7 +58,7 @@ pub struct Graph {
     selected_node: Option<u128>,
 }
 
-impl Default for Graph {
+impl<T: GraphNodeTrait> Default for Graph<T> {
     fn default() -> Self {
         Self {
             nodes: vec![],
@@ -71,7 +72,7 @@ impl Default for Graph {
     }
 }
 
-impl Graph {
+impl<T: GraphNodeTrait> Graph<T> {
     const MIN_SCALING: f32 = 0.1;
     const MAX_SCALING: f32 = 2.0;
     const GRID_SIZE: f32 = 32.0;
@@ -102,16 +103,16 @@ impl Graph {
         )
     }
 
-    pub fn get_node(&self, node_id: Option<u128>) -> Option<&GraphNodeType> {
+    pub fn get_node(&self, node_id: Option<u128>) -> Option<&T> {
         self.nodes.iter().find(|node| node.id() == node_id.unwrap_or(0))
     }
-    pub fn get_node_unsafe(&self, node_id: Option<u128>) -> &GraphNodeType {
+    pub fn get_node_unsafe(&self, node_id: Option<u128>) -> &T {
         self.get_node(node_id).unwrap()
     }
-    pub fn get_node_mut(&mut self, node_id: Option<u128>) -> Option<&mut GraphNodeType> {
+    pub fn get_node_mut(&mut self, node_id: Option<u128>) -> Option<&mut T> {
         self.nodes.iter_mut().find(|node| node.id() == node_id.unwrap_or(0))
     }
-    pub fn get_node_mut_unsafe(&mut self, node_id: Option<u128>) -> &mut GraphNodeType {
+    pub fn get_node_mut_unsafe(&mut self, node_id: Option<u128>) -> &mut T {
         self.get_node_mut(node_id).unwrap()
     }
     pub fn edges(&self) -> &Vec<Edge> {
@@ -140,7 +141,7 @@ impl Graph {
         self.selected_node = None;
     }
 
-    pub fn selected_node(&self) -> Option<&GraphNodeType> {
+    pub fn selected_node(&self) -> Option<&T> {
         self.nodes.iter().find(|node| self.selected_node == Some(node.id()))
     }
 
@@ -152,7 +153,7 @@ impl Graph {
         Canvas::new(self).width(Fill).height(Fill).into()
     }
 
-    pub fn insert_node(&mut self, node: GraphNodeType) {
+    pub fn insert_node(&mut self, node: T) {
         self.nodes.push(node);
     }
 
@@ -176,7 +177,7 @@ impl Graph {
                     center = found_node.anchor();
                     center.y += found_node.size().height * 2.0;
                 }
-                let new_node = GraphNodeType::GenealogicalNode(node::GenealogicalNode::new(center));
+                let new_node = T::new(center);
                 self.add_edge_between_nodes(edge_node_id, new_node.id());
                 self.insert_node(new_node);
             }
@@ -196,7 +197,7 @@ impl Graph {
     }
 }
 
-impl canvas::Program<GraphMessage> for Graph {
+impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
     type State = GraphInteraction;
 
     fn update(
