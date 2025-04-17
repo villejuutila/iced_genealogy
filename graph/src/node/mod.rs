@@ -1,5 +1,3 @@
-pub mod genealogical_node;
-
 use iced::{widget::canvas::Frame, Point, Size};
 
 pub trait GraphNodeTrait {

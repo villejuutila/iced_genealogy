@@ -1,10 +1,9 @@
+use graph::node::GraphNodeTrait;
 use iced::{
     widget::canvas::{Frame, Stroke, Text},
     Color, Point, Size,
 };
 use uuid::Uuid;
-
-use super::GraphNodeTrait;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sex {

@@ -1,10 +1,4 @@
-use graph::{
-    node::{
-        genealogical_node::{GenealogicalNode, Sex},
-        GraphNodeTrait,
-    },
-    GraphMessage,
-};
+use graph::{node::GraphNodeTrait, GraphMessage};
 use iced::{
     widget::{button, checkbox, column, container, text, text_input, Column, Container},
     Background, Border, Color,
@@ -12,7 +6,10 @@ use iced::{
     Shadow,
 };
 
-use crate::Message;
+use crate::{
+    genealogical_node::{GenealogicalNode, Sex},
+    Message,
+};
 
 pub fn side_panel<'a>(selected_node: Option<&'a GenealogicalNode>) -> Container<'a, Message> {
     let mut root = column![

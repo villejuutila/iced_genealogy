@@ -1,11 +1,10 @@
+mod genealogical_node;
 mod side_panel;
 
 use std::{env::current_dir, time::Duration};
 
-use graph::{
-    node::genealogical_node::{GenealogicalNode, Sex},
-    Graph, GraphMessage,
-};
+use genealogical_node::{GenealogicalNode, Sex};
+use graph::{Graph, GraphMessage};
 use iced::{
     event, time,
     widget::{container, row},
