@@ -1,5 +1,6 @@
 use iced::{
     event::Status,
+    keyboard::{self, Key},
     mouse::{self},
     widget::{
         canvas::{self, Cache, Path, Stroke},
@@ -33,6 +34,9 @@ pub enum GraphMessage {
     Scaled(f32, Option<Vector>),
     Translated(Vector),
     DraggingNode(u128, Point),
+    DrawEdge(u128),
+    InsertEdge(u128, u128),
+    CancelDrawEdge,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +60,7 @@ pub struct Graph<T: GraphNodeTrait> {
     translation: Vector,
     selected_node: Option<u128>,
     cache: Cache,
+    drawing_edge: Option<u128>,
 }
 
 impl<T: GraphNodeTrait> Default for Graph<T> {
@@ -69,6 +74,7 @@ impl<T: GraphNodeTrait> Default for Graph<T> {
             translation: Vector::default(),
             selected_node: None,
             cache: Cache::default(),
+            drawing_edge: None,
         }
     }
 }
@@ -190,6 +196,7 @@ impl<T: GraphNodeTrait> Graph<T> {
                 }
                 let new_node = T::new(center);
                 self.add_edge_between_nodes(edge_node_id, new_node.id());
+                self.set_selected_node(new_node.id());
                 self.insert_node(new_node);
                 self.cache.clear();
             }
@@ -202,6 +209,15 @@ impl<T: GraphNodeTrait> Graph<T> {
                     println!("Deselecting node {}", selected_node);
                     self.selected_node = None;
                 }
+            }
+            GraphMessage::DrawEdge(id) => {
+                self.drawing_edge = Some(id);
+            }
+            GraphMessage::CancelDrawEdge => {
+                self.drawing_edge = None;
+            }
+            GraphMessage::InsertEdge(start_id, end_id) => {
+                self.add_edge_between_nodes(Some(start_id), end_id);
             }
         }
     }
@@ -304,6 +320,12 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
                     }
                     mouse::Button::Left => {
                         if let GraphInteraction::HoverNode(id) = *interaction {
+                            if let Some(edge_start) = self.drawing_edge {
+                                message = Some(GraphMessage::InsertEdge(edge_start, id));
+                                status = Status::Captured;
+
+                                return (status, message);
+                            }
                             if let Some(selected_node) = self.selected_node {
                                 if selected_node == id {
                                     *interaction = GraphInteraction::DraggingNode(selected_node, cursor_position);
@@ -325,6 +347,15 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
                 },
                 _ => {}
             },
+            canvas::Event::Keyboard(keyboard_event) => match keyboard_event {
+                keyboard::Event::KeyPressed { key, .. } => {
+                    if let Key::Named(keyboard::key::Named::Escape) = key {
+                        message = Some(GraphMessage::CancelDrawEdge);
+                        status = Status::Captured;
+                    }
+                }
+                _ => {}
+            },
             _ => {}
         }
         self.cache.clear();
@@ -337,7 +368,7 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
         renderer: &Renderer,
         _theme: &Theme,
         bounds: Rectangle,
-        _cursor: mouse::Cursor,
+        cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let center = Vector::new(bounds.width / 2.0, bounds.height / 2.0);
         vec![self.cache.draw(renderer, bounds.size(), |frame| {
@@ -379,6 +410,23 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
                     frame.stroke(&start_path, stroke);
                     frame.stroke(&second_path, stroke);
                     frame.stroke(&end_path, stroke);
+                }
+
+                if let Some(node) = self.get_node(self.drawing_edge) {
+                    let Some(cursor_position) = cursor.position_in(bounds) else {
+                        return;
+                    };
+
+                    let canvas_position = self.window_to_canvas(cursor_position, bounds);
+                    let start_x = node.anchor().x + node.size().width / 2.0;
+                    let start_point = if canvas_position.y < node.anchor().y {
+                        Point::new(start_x, node.anchor().y)
+                    } else {
+                        Point::new(start_x, node.anchor().y + node.size().height)
+                    };
+                    let second_point = Point::new(start_x, start_point.y + (canvas_position.y - start_x) / 2.0);
+                    frame.stroke(&Path::line(start_point, second_point), stroke);
+                    frame.stroke(&Path::line(second_point, canvas_position), stroke);
                 }
             })
         })]
