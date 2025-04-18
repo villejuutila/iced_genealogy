@@ -5,12 +5,19 @@ edition = "2021"
 
 [workspace]
 resolver = "2"
-members = [ "graph"]
+members = [ "graph", "menubar"]
 
 [dependencies]
 iced = { version = "0.13.1", features = ["canvas", "tokio", "wgpu"] }
 iced_aw = "0.12.2"
 uuid = { version = "1.16.0", features = ["v4"] }
 graph = { path = "graph" }
+menubar = { path = "menubar" }
 rfd = "0.15.3"
 gedcom = "0.2.2"
+muda = "0.16.1"
+cocoa = "0.26.0"
+objc = "0.2.7"
+dispatch = "0.2.0"
+tracing-subscriber = "0.3.19"
+log = "0.4.27"

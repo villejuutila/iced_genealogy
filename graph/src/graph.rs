@@ -29,6 +29,7 @@ impl Default for GraphInteraction {
 pub enum GraphMessage {
     InsertNode(Option<u128>),
     ClickNode((u128, mouse::Event)),
+    ClickOutsideNode(mouse::Event),
     Scaled(f32, Option<Vector>),
     Translated(Vector),
     DraggingNode(u128, Point),
@@ -194,6 +195,12 @@ impl<T: GraphNodeTrait> Graph<T> {
                 let node = self.get_node_mut_unsafe(Some(id));
                 node.set_anchor(Self::snap_to_grid(offset));
             }
+            GraphMessage::ClickOutsideNode(_) => {
+                if let Some(selected_node) = self.selected_node {
+                    println!("Deselecting node {}", selected_node);
+                    self.selected_node = None;
+                }
+            }
         }
     }
 
@@ -218,7 +225,12 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
     ) -> (canvas::event::Status, Option<GraphMessage>) {
         let mut status = Status::Ignored;
         let mut message = None;
-        let cursor_position = cursor.position_in(bounds).unwrap_or(Point::ORIGIN);
+
+        let Some(cursor_position) = cursor.position_in(bounds) else {
+            return (status, message);
+        };
+
+        println!("GraphInteraction: {interaction:#?}");
         let canvas_position = self.window_to_canvas(cursor_position, bounds);
         match event {
             canvas::Event::Mouse(mouse_event) => match mouse_event {
@@ -292,12 +304,20 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
                     mouse::Button::Left => {
                         if let GraphInteraction::HoverNode(id) = *interaction {
                             if let Some(selected_node) = self.selected_node {
-                                *interaction = GraphInteraction::DraggingNode(selected_node, cursor_position);
-                                status = Status::Captured;
+                                if selected_node == id {
+                                    *interaction = GraphInteraction::DraggingNode(selected_node, cursor_position);
+                                    status = Status::Captured;
+                                } else {
+                                    message = Some(GraphMessage::ClickNode((id, mouse_event)));
+                                    status = Status::Captured;
+                                }
                             } else {
                                 message = Some(GraphMessage::ClickNode((id, mouse_event)));
                                 status = Status::Captured;
                             }
+                        } else {
+                            message = Some(GraphMessage::ClickOutsideNode(mouse_event));
+                            status = Status::Captured;
                         }
                     }
                     _ => {}

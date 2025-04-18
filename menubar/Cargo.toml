@@ -1,0 +1,13 @@
+[package]
+name = "menubar"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cocoa = "0.26.0"
+dispatch = "0.2.0"
+futures = { version = "0.3.31", features = ["executor"] }
+iced = "0.13.1"
+log = "0.4.27"
+objc = "0.2.7"
+once_cell = "1.21.3"

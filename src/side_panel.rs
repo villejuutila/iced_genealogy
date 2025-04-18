@@ -17,7 +17,6 @@ pub fn side_panel<'a>(selected_node: Option<&'a GenealogicalNode>) -> Container<
         button("Add new")
             .width(Fill)
             .on_press(Message::Graph(GraphMessage::InsertNode(None))),
-        button("Open file").width(Fill).on_press(Message::OpenFile)
     ]
     .spacing(10);
     if let Some(selected_node) = selected_node {
