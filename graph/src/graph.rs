@@ -230,7 +230,6 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
             return (status, message);
         };
 
-        println!("GraphInteraction: {interaction:#?}");
         let canvas_position = self.window_to_canvas(cursor_position, bounds);
         match event {
             canvas::Event::Mouse(mouse_event) => match mouse_event {
@@ -352,16 +351,32 @@ impl<T: GraphNodeTrait> canvas::Program<GraphMessage> for Graph<T> {
                     };
                     node.draw(&mut frame, hovered);
                 }
+                let stroke = Stroke::default().with_width(2.0).with_color(Color::WHITE);
+
                 for edge in self.edges() {
-                    let start = self.get_node_unsafe(Some(edge.start));
-                    let end = self.get_node_unsafe(Some(edge.end));
+                    let start_node = self.get_node_unsafe(Some(edge.start));
+                    let end_node = self.get_node_unsafe(Some(edge.end));
+                    let (start, end) = if start_node.anchor().y > end_node.anchor().y {
+                        (end_node, start_node)
+                    } else {
+                        (start_node, end_node)
+                    };
+
                     let start_point = Point::new(
                         start.anchor().x + start.size().width / 2.0,
                         start.anchor().y + start.size().height,
                     );
                     let end_point = Point::new(end.anchor().x + end.size().width / 2.0, end.anchor().y);
-                    let path = Path::line(start_point, end_point);
-                    frame.stroke(&path, Stroke::default().with_width(2.0).with_color(Color::WHITE));
+                    let second_point = Point::new(start_point.x, start_point.y + (end_point.y - start_point.y) / 2.0);
+                    let third_point = Point::new(end_point.x, second_point.y);
+
+                    let start_path = Path::line(start_point, second_point);
+                    let second_path = Path::line(second_point, third_point);
+                    let end_path = Path::line(third_point, end_point);
+
+                    frame.stroke(&start_path, stroke);
+                    frame.stroke(&second_path, stroke);
+                    frame.stroke(&end_path, stroke);
                 }
             })
         })]

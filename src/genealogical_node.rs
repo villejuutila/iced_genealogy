@@ -40,6 +40,12 @@ impl GenealogicalNode {
     pub fn set_first_name(&mut self, first_name: String) {
         self.first_name = Some(first_name);
     }
+    pub fn last_name(&self) -> Option<String> {
+        self.last_name.clone()
+    }
+    pub fn set_last_name(&mut self, last_name: String) {
+        self.last_name = Some(last_name);
+    }
 }
 
 impl GraphNodeTrait for GenealogicalNode {
