@@ -44,12 +44,12 @@ fn select_node_content<'a>(mut root: Column<'a, Message>, node: &'a Genealogical
     let selected_node_widgets: Column<'a, Message> = column![
         text(format!("Selected node: {}", node.id())).color(Color::BLACK),
         text_input("First name", &node.first_name().unwrap_or("".to_string()))
-            .on_input(move |input| Message::UpdateNodeName((node.id(), input)))
+            .on_input(move |input| Message::UpdateNodeFirstName((node.id(), input)))
             .padding(10)
             .size(20)
             .width(Fill),
         text_input("Last name", &node.last_name().unwrap_or("".to_string()))
-            .on_input(move |input| Message::UpdateNodeName((node.id(), input)))
+            .on_input(move |input| Message::UpdateNodeLastName((node.id(), input)))
             .padding(10)
             .size(20)
             .width(Fill),

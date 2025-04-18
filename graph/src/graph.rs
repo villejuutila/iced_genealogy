@@ -55,7 +55,6 @@ pub struct Graph<T: GraphNodeTrait> {
     scaling: f32,
     translation: Vector,
     selected_node: Option<u128>,
-    dragging: bool,
     cache: Cache,
 }
 
@@ -66,7 +65,6 @@ impl<T: GraphNodeTrait> Default for Graph<T> {
             tick: 0,
             bounds: Rectangle::new(Point::ORIGIN, Size::new(0.0, 0.0)),
             edges: vec![],
-            dragging: false,
             scaling: 1.0,
             translation: Vector::default(),
             selected_node: None,
@@ -79,6 +77,10 @@ impl<T: GraphNodeTrait> Graph<T> {
     const MIN_SCALING: f32 = 0.1;
     const MAX_SCALING: f32 = 2.0;
     const GRID_SIZE: f32 = 32.0;
+
+    pub fn redraw(&mut self) {
+        self.cache.clear();
+    }
 
     fn snap_to_grid(pos: Point) -> Point {
         Point::new(

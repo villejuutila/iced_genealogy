@@ -20,7 +20,8 @@ use side_panel::side_panel;
 enum Message {
     Graph(GraphMessage),
     Tick,
-    UpdateNodeName((u128, String)),
+    UpdateNodeFirstName((u128, String)),
+    UpdateNodeLastName((u128, String)),
     SetNodeSex((u128, Sex)),
     MenuBar(menubar::Event),
     OpenFileResult(Option<FileHandle>),
@@ -34,13 +35,20 @@ impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tick => self.graph.tick(),
-            Message::UpdateNodeName((node_id, name)) => {
+            Message::UpdateNodeFirstName((node_id, name)) => {
                 let node = self.graph.get_node_mut_unsafe(Some(node_id));
                 node.set_first_name(name);
+                self.graph.redraw();
+            }
+            Message::UpdateNodeLastName((node_id, name)) => {
+                let node = self.graph.get_node_mut_unsafe(Some(node_id));
+                node.set_last_name(name);
+                self.graph.redraw();
             }
             Message::SetNodeSex((node_id, sex)) => {
                 let node = self.graph.get_node_mut_unsafe(Some(node_id));
                 node.set_sex(sex);
+                self.graph.redraw();
             }
             Message::MenuBar(event) => match event {
                 menubar::Event::OpenFile => {

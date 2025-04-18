@@ -1,7 +1,7 @@
 use graph::node::GraphNodeTrait;
 use iced::{
-    widget::canvas::{Frame, Stroke, Text},
-    Color, Point, Size,
+    widget::canvas::{Frame, Text},
+    Color, Point, Size, Vector,
 };
 use uuid::Uuid;
 
@@ -22,12 +22,44 @@ pub struct GenealogicalNode {
 }
 
 impl GenealogicalNode {
-    fn text_position(&self) -> Point {
-        Point::new(
-            self.anchor.x + self.size.width / 2.0,
-            self.anchor.y + self.size.height / 2.0,
-        )
+    const NODE_PADDING_V: f32 = 0.3;
+    const NODE_PADDING_H: f32 = 0.4;
+    const NODE_FONT_SIZE: f32 = 16.0;
+
+    fn draw_first_name<'a>(&self, frame: &'a mut Frame) -> &'a Frame {
+        if let Some(first_name) = &self.first_name {
+            let padding_h = self.size().width * Self::NODE_PADDING_H;
+            let padding_v = self.size().height * Self::NODE_PADDING_V;
+
+            let anchor = self.anchor() + Vector::new(padding_h, padding_v);
+            frame.fill_text(Text {
+                content: first_name.clone(),
+                size: Self::NODE_FONT_SIZE.into(),
+                position: anchor,
+                color: Color::BLACK,
+                ..Default::default()
+            });
+        }
+        frame
     }
+
+    fn draw_last_name<'a>(&self, frame: &'a mut Frame) -> &'a Frame {
+        if let Some(last_name) = &self.last_name {
+            let padding_h = self.size().width * Self::NODE_PADDING_H;
+            let padding_v = self.size().height * Self::NODE_PADDING_V + Self::NODE_FONT_SIZE + 5.0;
+
+            let anchor = self.anchor() + Vector::new(padding_h, padding_v);
+            frame.fill_text(Text {
+                content: last_name.clone(),
+                size: Self::NODE_FONT_SIZE.into(),
+                position: anchor,
+                color: Color::BLACK,
+                ..Default::default()
+            });
+        }
+        frame
+    }
+
     pub fn sex(&self) -> Option<Sex> {
         self.sex.clone()
     }
@@ -75,47 +107,8 @@ impl GraphNodeTrait for GenealogicalNode {
         self.size
     }
 
-    fn draw<'a>(&self, frame: &'a mut Frame, hovered: bool) -> Vec<&'a Frame> {
-        let color = if hovered {
-            Color { a: 0.5, ..Color::WHITE }
-        } else {
-            Color::WHITE
-        };
-        frame.fill_rectangle(self.anchor, self.size, color);
-        if let Some(sex) = self.sex() {
-            let border_color = if sex == Sex::Male {
-                Color::from_rgb(0.0, 0.0, 255.0)
-            } else {
-                Color::from_rgb(255.0, 0.0, 0.0)
-            };
-            frame.stroke_rectangle(
-                self.anchor,
-                self.size,
-                Stroke::default().with_width(2.0).with_color(border_color),
-            );
-        }
-        let mut name = String::new();
-        if self.first_name.is_some() {
-            name.push_str(&self.first_name.as_ref().unwrap());
-        }
-        if self.last_name.is_some() {
-            name.push_str(&self.last_name.as_ref().unwrap());
-        }
-        frame.fill_text(Text {
-            content: name,
-            size: 20.0.into(),
-            color: Color {
-                a: 1.,
-                r: 1.,
-                g: 0.,
-                b: 0.,
-            },
-            position: self.text_position(),
-            vertical_alignment: iced::alignment::Vertical::Center,
-            horizontal_alignment: iced::alignment::Horizontal::Center,
-            ..Default::default()
-        });
-
-        vec![frame]
+    fn draw_content<'a>(&self, frame: &'a mut Frame) -> &'a Frame {
+        self.draw_first_name(frame);
+        self.draw_last_name(frame)
     }
 }
