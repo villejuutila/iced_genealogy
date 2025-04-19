@@ -22,8 +22,8 @@ pub struct GenealogicalNode {
 }
 
 impl GenealogicalNode {
-    const NODE_PADDING_V: f32 = 0.3;
-    const NODE_PADDING_H: f32 = 0.4;
+    const NODE_PADDING_V: f32 = 0.2;
+    const NODE_PADDING_H: f32 = 0.2;
     const NODE_FONT_SIZE: f32 = 16.0;
 
     fn draw_first_name<'a>(&self, frame: &'a mut Frame) -> &'a Frame {
@@ -85,7 +85,7 @@ impl GraphNodeTrait for GenealogicalNode {
         Self {
             anchor,
             id: Uuid::new_v4().as_u128(),
-            size: Size::new(100.0, 100.0),
+            size: Size::new(128.0, 96.0),
             sex: None,
             first_name: None,
             last_name: None,

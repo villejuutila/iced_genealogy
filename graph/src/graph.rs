@@ -218,6 +218,7 @@ impl<T: GraphNodeTrait> Graph<T> {
             }
             GraphMessage::InsertEdge(start_id, end_id) => {
                 self.add_edge_between_nodes(Some(start_id), end_id);
+                self.drawing_edge = None;
             }
         }
     }
